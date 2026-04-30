@@ -1,0 +1,95 @@
+import { Notification } from "../types/notification";
+
+export const SAMPLE_NOTIFICATIONS: Notification[] = [
+  // CRITICAL (Fire emergencies)
+  {
+    id: 1,
+    title: "🔥 Active Fire Detected",
+    message: "Smoke and high temperature detected in Building A, Floor 3.",
+    priority: "critical",
+    time: "2 min ago",
+    read: false,
+    location: "Building A - Floor 3",
+  },
+  {
+    id: 2,
+    title: "🚨 Emergency Evacuation",
+    message: "Immediate evacuation required at Sector 7 industrial zone.",
+    priority: "critical",
+    time: "8 min ago",
+    read: false,
+    location: "Sector 7",
+  },
+  {
+    id: 3,
+    title: "⚠️ System Malfunction",
+    message: "Fire suppression system offline in Warehouse B.",
+    priority: "critical",
+    time: "25 min ago",
+    read: false,
+    location: "Warehouse B",
+  },
+  // HIGH (Urgent warnings)
+  {
+    id: 4,
+    title: "🌡️ Temperature Alert",
+    message: "Abnormal temperature spike detected in Server Room 2.",
+    priority: "high",
+    time: "1 hr ago",
+    read: false,
+    location: "Server Room 2",
+  },
+  {
+    id: 5,
+    title: "💨 Smoke Detected",
+    message: "Light smoke detected in Parking Level B2.",
+    priority: "high",
+    time: "2 hrs ago",
+    read: true,
+    location: "Parking B2",
+  },
+  {
+    id: 6,
+    title: "🔋 Low Battery Alert",
+    message: "Fire alarm battery backup below 20% in Zone C.",
+    priority: "high",
+    time: "3 hrs ago",
+    read: true,
+    location: "Zone C",
+  },
+  // MEDIUM (Maintenance & Updates)
+  {
+    id: 7,
+    title: "🔧 Scheduled Maintenance",
+    message: "Fire detection system maintenance scheduled for tomorrow.",
+    priority: "medium",
+    time: "5 hrs ago",
+    read: true,
+    location: "All Zones",
+  },
+  {
+    id: 8,
+    title: "📊 Monthly Report Ready",
+    message: "Fire safety inspection report for January is available.",
+    priority: "medium",
+    time: "1 day ago",
+    read: true,
+  },
+  // LOW (General info)
+  {
+    id: 9,
+    title: "ℹ️ System Update",
+    message: "Fire alert system updated to version 2.4.1.",
+    priority: "low",
+    time: "2 days ago",
+    read: true,
+  },
+  {
+    id: 10,
+    title: "📢 Training Reminder",
+    message: "Fire safety training session scheduled for next week.",
+    priority: "low",
+    time: "3 days ago",
+    read: true,
+  },
+];
