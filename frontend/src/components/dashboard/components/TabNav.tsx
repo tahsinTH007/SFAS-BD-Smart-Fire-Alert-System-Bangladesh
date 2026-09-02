@@ -1,6 +1,16 @@
+"use client";
+
 import React from "react";
-import { Activity, Building2, Truck } from "lucide-react";
-import { DashboardTab } from "../types";
+import {
+  Activity,
+  Building2,
+  Cpu,
+  LayoutGrid,
+  Radio,
+  type LucideIcon,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DashboardTab } from "../types";
 
 interface TabNavProps {
   activeTab: DashboardTab;
@@ -8,84 +18,67 @@ interface TabNavProps {
   counts: {
     devices: number;
     buildings: number;
-    units: number;
+    stations: number;
+    telemetry: number;
   };
 }
+
+const TABS: {
+  key: DashboardTab;
+  label: string;
+  icon: LucideIcon;
+  countKey?: keyof TabNavProps["counts"];
+}[] = [
+  { key: "overview", label: "Overview", icon: LayoutGrid },
+  { key: "telemetry", label: "Live Sensors", icon: Activity, countKey: "telemetry" },
+  { key: "devices", label: "Devices", icon: Cpu, countKey: "devices" },
+  { key: "buildings", label: "Buildings", icon: Building2, countKey: "buildings" },
+  { key: "stations", label: "Stations", icon: Radio, countKey: "stations" },
+];
 
 export const TabNav: React.FC<TabNavProps> = ({
   activeTab,
   onTabChange,
   counts,
-}) => {
-  const tabs = [
-    {
-      id: "devices" as DashboardTab,
-      label: "Devices",
-      icon: Activity,
-      count: counts.devices,
-      color: "emerald",
-    },
-    {
-      id: "buildings" as DashboardTab,
-      label: "Buildings",
-      icon: Building2,
-      count: counts.buildings,
-      color: "blue",
-    },
-    {
-      id: "units" as DashboardTab,
-      label: "Fire Units",
-      icon: Truck,
-      count: counts.units,
-      color: "orange",
-    },
-  ];
+}) => (
+  <div
+    role="tablist"
+    aria-label="Dashboard sections"
+    className="sfas-scroll flex gap-1 overflow-x-auto rounded-xl border border-slate-800 bg-slate-900/60 p-1"
+  >
+    {TABS.map(({ key, label, icon: Icon, countKey }) => {
+      const active = activeTab === key;
+      const count = countKey ? counts[countKey] : undefined;
 
-  return (
-    <div className="flex items-center gap-2 p-1 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800">
-      {tabs.map((tab) => {
-        const Icon = tab.icon;
-        const isActive = activeTab === tab.id;
-
-        return (
-          <button
-            key={tab.id}
-            onClick={() => onTabChange(tab.id)}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all duration-200 flex-1 ${
-              isActive
-                ? `bg-white dark:bg-slate-800 shadow-sm border border-${tab.color}-200 dark:border-${tab.color}-800`
-                : "hover:bg-slate-50 dark:hover:bg-slate-800/50"
-            }`}
-          >
-            <Icon
-              size={18}
-              className={
-                isActive
-                  ? `text-${tab.color}-600 dark:text-${tab.color}-400`
-                  : "text-slate-500 dark:text-slate-400"
-              }
-            />
+      return (
+        <button
+          key={key}
+          role="tab"
+          aria-selected={active}
+          onClick={() => onTabChange(key)}
+          className={cn(
+            "flex shrink-0 items-center gap-2 rounded-lg px-3.5 py-2 text-xs font-semibold transition-colors sm:px-4",
+            active
+              ? "bg-slate-800 text-slate-50 shadow-sm"
+              : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200",
+          )}
+        >
+          <Icon size={14} className={active ? "text-orange-400" : ""} />
+          <span>{label}</span>
+          {count !== undefined && (
             <span
-              className={`text-sm font-semibold ${
-                isActive
-                  ? `text-${tab.color}-900 dark:text-${tab.color}-100`
-                  : "text-slate-600 dark:text-slate-400"
-              }`}
+              className={cn(
+                "rounded-full px-1.5 py-0.5 text-[10px] tabular-nums",
+                active
+                  ? "bg-slate-700 text-slate-200"
+                  : "bg-slate-800 text-slate-500",
+              )}
             >
-              {tab.label}
+              {count}
             </span>
-            <span
-              className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
-                isActive
-                  ? `bg-${tab.color}-100 dark:bg-${tab.color}-950/50 text-${tab.color}-700 dark:text-${tab.color}-300`
-                  : "bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400"
-              }`}
-            >
-              {tab.count}
-            </span>
-          </button>
-        );
-      })}
-    </div>
-  );
-};
+          )}
+        </button>
+      );
+    })}
+  </div>
+);
