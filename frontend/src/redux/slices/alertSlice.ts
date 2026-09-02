@@ -1,86 +1,241 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
-import { AlertResponse } from "@/api/alertApi";
-import axios from "axios";
+import { alertApi } from "@/api/alertApi";
+import { toApiError } from "@/lib/axiosClient";
+import type { AlertResponse, AlertStats } from "@/api/types";
 
-// ✅ Fetch all alerts
-export const fetchAlerts = createAsyncThunk<AlertResponse[]>(
-  "alerts/fetchAlerts",
-  async () => {
-    const res = await axios.get("http://localhost:8080/api/v1/alerts");
-    if (res.status !== 200) throw new Error("Failed to fetch alerts");
-    return res.data.data;
-  },
-);
+/**
+ * Every mutation goes through the API and stores the server's response.
+ *
+ * The previous version dispatched plain reducers for acknowledge / markRead /
+ * delete, so those changes lived only in memory and vanished on refresh.
+ */
 
-// ✅ Fetch single alert by ID
-export const fetchAlertById = createAsyncThunk<AlertResponse, string>(
-  "alerts/fetchAlertById",
-  async (id: string) => {
-    const res = await axios.get(`http://localhost:8080/api/v1/alerts/${id}`);
-    if (res.status !== 200)
-      throw new Error(`Failed to fetch alert with ID ${id}`);
-    return res.data.data;
-  },
-);
+const asError = (err: unknown) => toApiError(err).message;
 
-// ✅ Fetch alerts by priority
-export const fetchAlertsByPriority = createAsyncThunk<AlertResponse[], string>(
-  "alerts/fetchAlertsByPriority",
-  async (priority: string) => {
-    const res = await axios.get(
-      `http://localhost:8080/api/v1/alerts/priority/${priority}`,
-    );
+// ─── Thunks ───────────────────────────────────────────────────────────────────
 
-    if (res.status !== 200) {
-      throw new Error("Failed to fetch alerts by priority");
-    }
+export const fetchAlerts = createAsyncThunk<
+  AlertResponse[],
+  void,
+  { rejectValue: string }
+>("alerts/fetchAlerts", async (_, { rejectWithValue }) => {
+  try {
+    return await alertApi.getAllAlerts();
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
 
-    return res.data.data;
-  },
-);
+export const fetchAlertById = createAsyncThunk<
+  AlertResponse,
+  string,
+  { rejectValue: string }
+>("alerts/fetchAlertById", async (id, { rejectWithValue }) => {
+  try {
+    return await alertApi.getSingleAlert(id);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const fetchAlertsByPriority = createAsyncThunk<
+  AlertResponse[],
+  string,
+  { rejectValue: string }
+>("alerts/fetchAlertsByPriority", async (priority, { rejectWithValue }) => {
+  try {
+    return await alertApi.getAlertsByPriority(priority);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const fetchAlertStats = createAsyncThunk<
+  AlertStats,
+  void,
+  { rejectValue: string }
+>("alerts/fetchStats", async (_, { rejectWithValue }) => {
+  try {
+    return await alertApi.getStats();
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const markAlertRead = createAsyncThunk<
+  AlertResponse,
+  { id: string; read?: boolean },
+  { rejectValue: string }
+>("alerts/markRead", async ({ id, read = true }, { rejectWithValue }) => {
+  try {
+    return await alertApi.markRead(id, read);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const acknowledgeAlert = createAsyncThunk<
+  AlertResponse,
+  string,
+  { rejectValue: string }
+>("alerts/acknowledge", async (id, { rejectWithValue }) => {
+  try {
+    return await alertApi.acknowledge(id);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const resolveAlert = createAsyncThunk<
+  AlertResponse,
+  { id: string; note?: string },
+  { rejectValue: string }
+>("alerts/resolve", async ({ id, note }, { rejectWithValue }) => {
+  try {
+    return await alertApi.resolve(id, note);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const reopenAlert = createAsyncThunk<
+  AlertResponse,
+  string,
+  { rejectValue: string }
+>("alerts/reopen", async (id, { rejectWithValue }) => {
+  try {
+    return await alertApi.reopen(id);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const addAlertComment = createAsyncThunk<
+  AlertResponse,
+  { id: string; body: string },
+  { rejectValue: string }
+>("alerts/addComment", async ({ id, body }, { rejectWithValue }) => {
+  try {
+    return await alertApi.addComment(id, body);
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const removeAlert = createAsyncThunk<
+  string,
+  string,
+  { rejectValue: string }
+>("alerts/remove", async (id, { rejectWithValue }) => {
+  try {
+    await alertApi.remove(id);
+    return id;
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const bulkMarkRead = createAsyncThunk<
+  string[],
+  string[],
+  { rejectValue: string }
+>("alerts/bulkMarkRead", async (ids, { rejectWithValue }) => {
+  try {
+    await alertApi.bulkMarkRead(ids, true);
+    return ids;
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const bulkAcknowledge = createAsyncThunk<
+  string[],
+  string[],
+  { rejectValue: string }
+>("alerts/bulkAcknowledge", async (ids, { rejectWithValue }) => {
+  try {
+    await alertApi.bulkAcknowledge(ids);
+    return ids;
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+export const bulkRemove = createAsyncThunk<
+  string[],
+  string[],
+  { rejectValue: string }
+>("alerts/bulkRemove", async (ids, { rejectWithValue }) => {
+  try {
+    await alertApi.bulkDelete(ids);
+    return ids;
+  } catch (err) {
+    return rejectWithValue(asError(err));
+  }
+});
+
+// ─── State ────────────────────────────────────────────────────────────────────
 
 interface AlertState {
   alerts: AlertResponse[];
   selectedAlert: AlertResponse | null;
+  stats: AlertStats | null;
   loading: boolean;
+  detailLoading: boolean;
+  mutating: boolean;
   error: string | null;
+  lastSyncedAt: string | null;
 }
 
 const initialState: AlertState = {
   alerts: [],
   selectedAlert: null,
+  stats: null,
   loading: false,
+  detailLoading: false,
+  mutating: false,
   error: null,
+  lastSyncedAt: null,
 };
+
+function upsert(state: AlertState, alert: AlertResponse) {
+  const i = state.alerts.findIndex((a) => a.id === alert.id);
+  if (i === -1) state.alerts.unshift(alert);
+  else state.alerts[i] = alert;
+
+  if (state.selectedAlert?.id === alert.id) state.selectedAlert = alert;
+}
 
 const alertSlice = createSlice({
   name: "alerts",
   initialState,
   reducers: {
-    setAlerts: (state, action: PayloadAction<AlertResponse[]>) => {
-      state.alerts = action.payload;
-    },
-    addAlert: (state, action: PayloadAction<AlertResponse>) => {
-      state.alerts.unshift(action.payload);
-    },
-    updateAlert: (state, action: PayloadAction<AlertResponse>) => {
-      const index = state.alerts.findIndex((a) => a.id === action.payload.id);
-      if (index !== -1) state.alerts[index] = action.payload;
-
-      if (state.selectedAlert?.id === action.payload.id) {
-        state.selectedAlert = action.payload;
+    /** Socket push: a brand new alert arrived. */
+    alertReceived: (state, action: PayloadAction<AlertResponse>) => {
+      if (!state.alerts.some((a) => a.id === action.payload.id)) {
+        state.alerts.unshift(action.payload);
       }
     },
-    deleteAlert: (state, action: PayloadAction<string>) => {
+    /** Socket push: an alert changed elsewhere. */
+    alertUpdated: (state, action: PayloadAction<AlertResponse>) => {
+      upsert(state, action.payload);
+    },
+    /** Socket push: an alert was deleted elsewhere. */
+    alertRemoved: (state, action: PayloadAction<string>) => {
       state.alerts = state.alerts.filter((a) => a.id !== action.payload);
-
       if (state.selectedAlert?.id === action.payload) {
         state.selectedAlert = null;
       }
     },
+    clearSelectedAlert: (state) => {
+      state.selectedAlert = null;
+    },
+    clearError: (state) => {
+      state.error = null;
+    },
   },
+
   extraReducers: (builder) => {
-    // 🔹 Fetch all alerts
     builder
       .addCase(fetchAlerts.pending, (state) => {
         state.loading = true;
@@ -89,48 +244,97 @@ const alertSlice = createSlice({
       .addCase(fetchAlerts.fulfilled, (state, action) => {
         state.loading = false;
         state.alerts = action.payload;
+        state.lastSyncedAt = new Date().toISOString();
       })
       .addCase(fetchAlerts.rejected, (state, action) => {
         state.loading = false;
-        state.error = action.error.message || "Failed to fetch alerts";
+        state.error = action.payload ?? "Failed to fetch alerts";
       });
 
-    // 🔹 Fetch single alert
     builder
       .addCase(fetchAlertById.pending, (state) => {
-        state.loading = true;
+        state.detailLoading = true;
         state.error = null;
-        state.selectedAlert = null;
       })
       .addCase(fetchAlertById.fulfilled, (state, action) => {
-        state.loading = false;
+        state.detailLoading = false;
         state.selectedAlert = action.payload;
+        upsert(state, action.payload);
       })
       .addCase(fetchAlertById.rejected, (state, action) => {
-        state.loading = false;
-        state.error = action.error.message || "Failed to fetch alert";
+        state.detailLoading = false;
         state.selectedAlert = null;
+        state.error = action.payload ?? "Failed to fetch alert";
       });
 
-    // ✅ 🔥 Fetch alerts by priority (YOU MISSED THIS)
     builder
-      .addCase(fetchAlertsByPriority.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
       .addCase(fetchAlertsByPriority.fulfilled, (state, action) => {
         state.loading = false;
-        state.alerts = action.payload; // replace list with filtered
+        state.alerts = action.payload;
       })
-      .addCase(fetchAlertsByPriority.rejected, (state, action) => {
-        state.loading = false;
-        state.error =
-          action.error.message || "Failed to fetch alerts by priority";
+      .addCase(fetchAlertStats.fulfilled, (state, action) => {
+        state.stats = action.payload;
+      });
+
+    // Every single-alert mutation stores the server's returned document.
+    for (const thunk of [
+      markAlertRead,
+      acknowledgeAlert,
+      resolveAlert,
+      reopenAlert,
+      addAlertComment,
+    ]) {
+      builder
+        .addCase(thunk.pending, (state) => {
+          state.mutating = true;
+        })
+        .addCase(thunk.fulfilled, (state, action) => {
+          state.mutating = false;
+          upsert(state, action.payload as AlertResponse);
+        })
+        .addCase(thunk.rejected, (state, action) => {
+          state.mutating = false;
+          state.error = (action.payload as string) ?? "Action failed";
+        });
+    }
+
+    builder.addCase(removeAlert.fulfilled, (state, action) => {
+      state.alerts = state.alerts.filter((a) => a.id !== action.payload);
+      if (state.selectedAlert?.id === action.payload) {
+        state.selectedAlert = null;
+      }
+    });
+
+    builder
+      .addCase(bulkMarkRead.fulfilled, (state, action) => {
+        const ids = new Set(action.payload);
+        state.alerts.forEach((a) => {
+          if (ids.has(a.id)) a.read = true;
+        });
+      })
+      .addCase(bulkAcknowledge.fulfilled, (state, action) => {
+        const ids = new Set(action.payload);
+        state.alerts.forEach((a) => {
+          if (ids.has(a.id)) {
+            a.acknowledged = true;
+            a.read = true;
+            a.status = "acknowledged";
+          }
+        });
+      })
+      .addCase(bulkRemove.fulfilled, (state, action) => {
+        const ids = new Set(action.payload);
+        state.alerts = state.alerts.filter((a) => !ids.has(a.id));
       });
   },
 });
 
-export const { setAlerts, addAlert, updateAlert, deleteAlert } =
-  alertSlice.actions;
+export const {
+  alertReceived,
+  alertUpdated,
+  alertRemoved,
+  clearSelectedAlert,
+  clearError,
+} = alertSlice.actions;
 
 export default alertSlice.reducer;

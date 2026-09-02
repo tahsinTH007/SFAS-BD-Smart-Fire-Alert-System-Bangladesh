@@ -49,28 +49,28 @@ export function assessRisk(data: Partial<ISensorData>): RiskAssessment {
 
   // ── Flame: the strongest single indicator ────────────────────────────────
   if (flame === 1) {
-    score += 55;
+    score += 50;
     factors.push("flame");
   }
 
   // ── Smoke ────────────────────────────────────────────────────────────────
-  const smokeWeight = ramp(smoke, numeric.smokeThreshold, numeric.smokeThreshold * 2.5);
+  const smokeWeight = ramp(smoke, numeric.smokeThreshold, numeric.smokeThreshold * 2);
   if (smokeWeight > 0) {
-    score += 30 * smokeWeight;
+    score += 35 * smokeWeight;
     factors.push("smoke");
   }
 
   // ── Combustible gas ──────────────────────────────────────────────────────
-  const gasWeight = ramp(gas, numeric.gasThreshold, numeric.gasThreshold * 2);
+  const gasWeight = ramp(gas, numeric.gasThreshold, numeric.gasThreshold * 1.7);
   if (gasWeight > 0) {
-    score += 25 * gasWeight;
+    score += 30 * gasWeight;
     factors.push("gas");
   }
 
   // ── Temperature ──────────────────────────────────────────────────────────
-  const tempWeight = ramp(temp, numeric.tempThreshold, numeric.tempThreshold + 40);
+  const tempWeight = ramp(temp, numeric.tempThreshold, numeric.tempThreshold + 30);
   if (tempWeight > 0) {
-    score += 20 * tempWeight;
+    score += 25 * tempWeight;
     factors.push("temperature");
   }
 
@@ -82,10 +82,29 @@ export function assessRisk(data: Partial<ISensorData>): RiskAssessment {
   }
 
   // ── Corroboration bonus ──────────────────────────────────────────────────
-  // Independent sensors agreeing is worth more than the sum of their parts.
+  // Independent sensors agreeing is worth more than the sum of their parts:
+  // this is the whole reason for fusing sensors rather than alarming on one.
   const independent = factors.filter((f) => f !== "temperature-humidity").length;
-  if (independent >= 3) score += 15;
-  else if (independent === 2) score += 8;
+  if (independent >= 3) score += 20;
+  else if (independent === 2) score += 10;
+
+  // ── Single-sensor severity floor ─────────────────────────────────────────
+  // Fusion raises confidence, but one sensor deep into danger still warrants an
+  // alarm on its own — a 1.7x-threshold LPG reading is an emergency even with
+  // every other sensor quiet.
+  const severe =
+    smoke >= numeric.smokeThreshold * 2 ||
+    gas >= numeric.gasThreshold * 1.5 ||
+    temp >= numeric.tempThreshold + 25;
+
+  if (severe) score = Math.max(score, 45);
+
+  // A confirmed flame is never merely informational. On its own it stays below
+  // critical, because a lone IR sensor can trip on sunlight or a hot element —
+  // but as soon as a second sensor agrees, it is treated as a real fire.
+  if (flame === 1) {
+    score = Math.max(score, independent >= 2 ? 75 : 60);
+  }
 
   score = Math.max(0, Math.min(100, Math.round(score)));
 
