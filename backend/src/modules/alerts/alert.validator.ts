@@ -1,176 +1,74 @@
 import { z } from "zod";
-import { Types } from "mongoose";
 
-// Custom validator for MongoDB ObjectId
-const objectIdSchema = z.string().refine((val) => Types.ObjectId.isValid(val), {
-  message: "Invalid MongoDB ObjectId format",
+const boolish = z
+  .enum(["true", "false"])
+  .optional()
+  .transform((v) => (v === undefined ? undefined : v === "true"));
+
+export const listAlertsQuerySchema = z.object({
+  page: z
+    .string()
+    .optional()
+    .transform((v) => Math.max(1, parseInt(v || "1", 10) || 1)),
+  limit: z
+    .string()
+    .optional()
+    .transform((v) => Math.min(200, Math.max(1, parseInt(v || "50", 10) || 50))),
+
+  priority: z.enum(["critical", "important", "info", "all"]).optional(),
+  status: z.enum(["active", "acknowledged", "resolved", "all"]).optional(),
+  type: z.string().max(50).optional(),
+  deviceId: z.string().max(100).optional(),
+  building: z.string().max(100).optional(),
+  sector: z.string().max(100).optional(),
+
+  read: boolish,
+  acknowledged: boolish,
+
+  search: z.string().max(200).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+
+  sortBy: z
+    .enum(["createdAt", "timestamp", "priority", "riskScore"])
+    .optional()
+    .default("createdAt"),
+  sortOrder: z.enum(["asc", "desc"]).optional().default("desc"),
 });
 
-// Priority enum with description
-const alertPrioritySchema = z.enum([
-  "critical",
-  "high",
-  "medium",
-  "low",
-  "important",
-  "info",
-]);
+export const operatorSchema = z.object({
+  operator: z.string().min(1).max(100).optional().default("Operator"),
+});
 
-// Status enum
-const alertStatusSchema = z.enum(["active", "acknowledged", "resolved"]);
+export const resolveSchema = z.object({
+  operator: z.string().min(1).max(100).optional().default("Operator"),
+  note: z.string().max(2000).optional(),
+});
 
-// Temperature validator (optional but if present must be reasonable)
-const temperatureSchema = z
-  .number()
-  .min(-100, "Temperature too low")
-  .max(200, "Temperature too high")
-  .optional();
+export const commentSchema = z.object({
+  author: z.string().min(1).max(100).optional().default("Operator"),
+  body: z.string().min(1, "Comment cannot be empty").max(2000),
+});
 
-// Smoke level validator (0-100% or ppm)
-const smokeLevelSchema = z
-  .number()
-  .min(0, "Smoke level cannot be negative")
-  .max(10000, "Smoke level too high")
-  .optional();
+export const bulkIdsSchema = z.object({
+  ids: z
+    .array(z.string().min(1))
+    .min(1, "At least one id is required")
+    .max(500, "Too many ids in one request"),
+  operator: z.string().max(100).optional().default("Operator"),
+  read: z.boolean().optional(),
+});
 
-// Phone number validator (optional)
-const phoneNumberSchema = z
-  .string()
-  .regex(
-    /^[\+]?[(]?[0-9]{1,3}[)]?[-\s\.]?[(]?[0-9]{1,4}[)]?[-\s\.]?[0-9]{1,4}[-\s\.]?[0-9]{1,9}$/,
-    "Invalid phone number format",
-  )
-  .optional();
+export const timeseriesQuerySchema = z.object({
+  hours: z
+    .string()
+    .optional()
+    .transform((v) => Math.min(720, Math.max(1, parseInt(v || "24", 10) || 24))),
+});
 
-// Enhanced Alert Schema
-export const alertSchema = z
-  .object({
-    type: z
-      .string()
-      .min(1, "Type is required")
-      .max(100, "Type too long (max 100 characters)"),
-
-    priority: alertPrioritySchema,
-
-    title: z
-      .string()
-      .min(1, "Title is required")
-      .max(200, "Title too long (max 200 characters)"),
-
-    message: z
-      .string()
-      .min(1, "Message is required")
-      .max(2000, "Message too long (max 2000 characters)"),
-
-    deviceId: z.string().max(100, "Device ID too long").optional(),
-
-    sector: z.string().max(100, "Sector name too long").optional(),
-
-    building: z.string().max(100, "Building name too long").optional(),
-
-    floor: z
-      .number()
-      .int("Floor must be an integer")
-      .min(-10, "Invalid floor number")
-      .max(200, "Invalid floor number")
-      .optional(),
-
-    room: z.string().max(50, "Room identifier too long").optional(),
-
-    location: z.string().max(500, "Location description too long").optional(),
-
-    temperature: temperatureSchema,
-
-    smokeLevel: smokeLevelSchema,
-
-    reportedBy: z.string().max(100, "Reporter name too long").optional(),
-
-    contactNumber: phoneNumberSchema,
-
-    status: alertStatusSchema.default("active"),
-
-    acknowledgedBy: objectIdSchema.optional(),
-
-    acknowledgedAt: z
-      .date()
-      .max(new Date(), "Acknowledgment date cannot be in the future")
-      .optional(),
-
-    resolvedBy: objectIdSchema.optional(),
-
-    resolvedAt: z
-      .date()
-      .max(new Date(), "Resolution date cannot be in the future")
-      .optional(),
-
-    read: z.boolean().default(false),
-
-    acknowledged: z.boolean().default(false),
-
-    incident: objectIdSchema.optional(),
-
-    timestamp: z
-      .date()
-      .max(new Date(), "Timestamp cannot be in the future")
-      .default(() => new Date()),
-  })
-  .refine(
-    (data) => {
-      // If acknowledged is true, acknowledgedBy and acknowledgedAt should be present
-      if (data.acknowledged && (!data.acknowledgedBy || !data.acknowledgedAt)) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message:
-        "Acknowledged alerts must have acknowledgedBy and acknowledgedAt",
-      path: ["acknowledged"],
-    },
-  )
-  .refine(
-    (data) => {
-      // If status is resolved, resolvedBy and resolvedAt should be present
-      if (
-        data.status === "resolved" &&
-        (!data.resolvedBy || !data.resolvedAt)
-      ) {
-        return false;
-      }
-      return true;
-    },
-    {
-      message: "Resolved alerts must have resolvedBy and resolvedAt",
-      path: ["status"],
-    },
-  );
-
-export function validateAlert(data: unknown) {
-  try {
-    return alertSchema.parse(data);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const formattedErrors = error.issues.map((err: z.ZodIssue) => ({
-        field: err.path.join("."),
-        message: err.message,
-      }));
-      throw new Error(`Validation failed: ${JSON.stringify(formattedErrors)}`);
-    }
-    throw error;
-  }
-}
-
-export function validatePartialAlert(data: unknown) {
-  try {
-    return alertSchema.partial().parse(data);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      const formattedErrors = error.issues.map((err: z.ZodIssue) => ({
-        field: err.path.join("."),
-        message: err.message,
-      }));
-      throw new Error(`Validation failed: ${JSON.stringify(formattedErrors)}`);
-    }
-    throw error;
-  }
-}
+export const topDevicesQuerySchema = z.object({
+  limit: z
+    .string()
+    .optional()
+    .transform((v) => Math.min(50, Math.max(1, parseInt(v || "5", 10) || 5))),
+});

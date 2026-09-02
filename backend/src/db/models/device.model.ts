@@ -52,9 +52,16 @@ export const DeviceSchema = new Schema(
 
     lastSensorData: {
       temperature: { type: Number, default: 0 },
+      humidity: { type: Number, default: 0 },
       smokeLevel: { type: Number, default: 0 },
       gasLevel: { type: Number, default: 0 },
+      flame: { type: Number, default: 0 },
+      riskScore: { type: Number, default: 0 },
+      readAt: { type: Date, default: null },
     },
+
+    /** Human label for the monitored area, e.g. "Server Room", "Kitchen". */
+    label: { type: String, trim: true, default: null },
 
     location: {
       type: {

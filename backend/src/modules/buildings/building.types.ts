@@ -10,5 +10,17 @@ export type BuildingInput = {
   occupancyType: "residential" | "commercial";
   ownerName?: string;
   ownerContact?: string;
+  /** [longitude, latitude] */
   coordinates: number[];
+};
+
+export type BuildingQuery = {
+  page: number;
+  limit: number;
+  search?: string;
+  sector?: string;
+  occupancyType?: string;
+  stationId?: string;
+  sortBy: string;
+  sortOrder: "asc" | "desc";
 };

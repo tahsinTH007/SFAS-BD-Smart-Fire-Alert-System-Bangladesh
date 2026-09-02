@@ -2,10 +2,18 @@ import { Router } from "express";
 import * as DeviceController from "../modules/devices/device.controller.js";
 import {
   checkDeviceCreateRateLimit,
+  checkHeartbeatRateLimit,
   validateDevice,
 } from "../modules/devices/device.middlewares.js";
 
 export const devicesRouter = Router();
+
+devicesRouter.get("/stats", DeviceController.getDeviceStats);
+devicesRouter.get("/telemetry", DeviceController.getLiveTelemetry);
+
+devicesRouter.post("/heartbeat", checkHeartbeatRateLimit, DeviceController.heartbeat);
+
+devicesRouter.get("/", DeviceController.getAllDevices);
 
 devicesRouter.post(
   "/",
@@ -14,4 +22,8 @@ devicesRouter.post(
   DeviceController.addNewDevice,
 );
 
-devicesRouter.get("/", DeviceController.getAllDevices);
+devicesRouter.get("/:deviceCode/readings", DeviceController.getDeviceReadings);
+
+devicesRouter.get("/:id", DeviceController.getSingleDevice);
+devicesRouter.patch("/:id", DeviceController.updateDevice);
+devicesRouter.delete("/:id", DeviceController.deleteDevice);

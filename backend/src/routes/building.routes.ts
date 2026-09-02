@@ -7,9 +7,17 @@ import {
 
 export const buildingsRouter = Router();
 
+buildingsRouter.get("/stats", BuildingController.getBuildingStats);
+
+buildingsRouter.get("/", BuildingController.getAllBuildings);
+
 buildingsRouter.post(
   "/",
   validateBuilding,
   checkBuildingCreateRateLimit,
   BuildingController.addNewBuilding,
 );
+
+buildingsRouter.get("/:id", BuildingController.getSingleBuilding);
+buildingsRouter.patch("/:id", BuildingController.updateBuilding);
+buildingsRouter.delete("/:id", BuildingController.deleteBuilding);

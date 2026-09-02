@@ -1,31 +1,57 @@
-import { Server } from "socket.io";
+import type { Server as HttpServer } from "node:http";
+import { Server, Socket } from "socket.io";
 import { env } from "./env.js";
+import { isOriginAllowed } from "./cors.js";
 import { logger } from "../lib/logger.js";
 import { registerAlertSocket } from "../modules/alerts/alert.socket.js";
 
-let io: Server;
+let io: Server | null = null;
 
-export const initSocket = (server: any) => {
+export const initSocket = (server: HttpServer): Server => {
   io = new Server(server, {
+    path: env.SOCKET_PATH,
+    pingInterval: Number(env.SOCKET_PING_INTERVAL),
+    pingTimeout: Number(env.SOCKET_PING_TIMEOUT),
     cors: {
-      origin: env.SOCKET_CORS_ORIGIN || "http://localhost:3000",
+      origin(origin, callback) {
+        if (!origin) return callback(null, true);
+        if (origin === env.SOCKET_CORS_ORIGIN || isOriginAllowed(origin)) {
+          return callback(null, true);
+        }
+        return callback(new Error(`Origin ${origin} not allowed`), false);
+      },
       methods: ["GET", "POST"],
       credentials: true,
     },
   });
 
-  io.on("connection", (socket) => {
-    logger.info("Client connected:", socket.id);
+  io.on("connection", (socket: Socket) => {
+    logger.debug(`Socket connected: ${socket.id}`);
 
-    // Register module-specific sockets
-    registerAlertSocket(socket, io);
+    registerAlertSocket(socket, io!);
 
-    socket.on("disconnect", () => {
-      logger.info("Client disconnected:", socket.id);
+    socket.on("disconnect", (reason) => {
+      logger.debug(`Socket disconnected: ${socket.id} (${reason})`);
     });
   });
 
   return io;
 };
+
+export const getIO = (): Server | null => io;
+
+/** Broadcasts to every connected dashboard. No-op before initSocket runs. */
+export function emitToAll(event: string, payload: unknown): void {
+  io?.emit(event, payload);
+}
+
+/** Broadcasts to one room, e.g. `building:Building A`. */
+export function emitToRoom(
+  room: string,
+  event: string,
+  payload: unknown,
+): void {
+  io?.to(room).emit(event, payload);
+}
 
 export { io };

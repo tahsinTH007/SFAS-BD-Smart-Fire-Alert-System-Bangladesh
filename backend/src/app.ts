@@ -2,36 +2,48 @@ import express from "express";
 import helmet from "helmet";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFoundHandler.js";
+import { requestMetrics } from "./middlewares/requestMetrics.js";
 import { corsMiddleware } from "./config/cors.js";
 import { apiRouter } from "./routes/index.js";
 import { applyGlobalRateLimit } from "./config/globalRateLimit.js";
-import { healthRouter } from "./routes/health.route.js";
-import { circuitGuard } from "./middlewares/requestSampler.js";
+import { env } from "./config/env.js";
 
 export function createApp() {
   const app = express();
 
-  // Security headers
-  app.use(helmet());
+  // Behind a reverse proxy, req.ip must come from X-Forwarded-For for rate
+  // limiting to key on the real client rather than the proxy.
+  app.set("trust proxy", 1);
+  app.disable("x-powered-by");
 
-  // CORS
+  app.use(
+    helmet({
+      // The API serves JSON to a separate origin; CORP would block those reads.
+      crossOriginResourcePolicy: { policy: "cross-origin" },
+    }),
+  );
+
   app.use(corsMiddleware);
 
-  // Global rate limit
+  app.use(requestMetrics);
+
+  app.use(express.json({ limit: "1mb" }));
+  app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
   app.use(applyGlobalRateLimit);
 
-  // Parse JSON & URL-encoded bodies
-  app.use(express.json());
-  app.use(express.urlencoded({ extended: true }));
+  app.get("/", (_req, res) => {
+    res.json({
+      name: env.APP_NAME,
+      description: "OGNIBORMO smart fire detection API",
+      version: "1.0.0",
+      docs: "/api/v1/health/ready",
+    });
+  });
 
-  app.use("/api/v1/health", healthRouter);
+  app.use("/api/v1", apiRouter);
 
-  app.use("/api/v1", circuitGuard, apiRouter);
-
-  // 404 handler
   app.use(notFoundHandler);
-
-  // Global error handler (last middleware)
   app.use(errorHandler);
 
   return app;

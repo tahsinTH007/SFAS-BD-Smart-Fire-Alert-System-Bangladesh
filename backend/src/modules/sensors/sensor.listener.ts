@@ -1,83 +1,65 @@
-import { serialParser } from "../../config/serial.js";
-import { ISensorData } from "./sensor.types.js";
-import { createAlert } from "../alerts/alert.service.js";
+import { env } from "../../config/env.js";
+import { logger } from "../../lib/logger.js";
+import { initSerial, serialEvents } from "../../config/serial.js";
+import { ingestReading } from "./sensor.service.js";
+import type { ISensorData } from "./sensor.types.js";
 
-const deviceStateMap = new Map<
-  string,
-  {
-    lastFire: number;
-    lastSmoke: boolean;
-  }
->();
+/** Strips control characters the Arduino occasionally emits mid-frame. */
+function clean(line: string): string {
+  return line.replace(/[^\x20-\x7E]+/g, "").trim();
+}
 
-// 🔥 MUST match Arduino threshold
-const SMOKE_THRESHOLD = 80;
-
-export const initSensorListener = () => {
-  serialParser.on("data", async (data: string) => {
+function parseFrame(line: string): ISensorData | null {
+  if (env.SERIAL_DATA_FORMAT === "json") {
     try {
-      const cleanData = data.replace(/[^\x20-\x7E]+/g, "").trim();
-      if (!cleanData) return;
+      return JSON.parse(line) as ISensorData;
+    } catch {
+      return null;
+    }
+  }
 
-      let sensorData: ISensorData;
+  if (env.SERIAL_DATA_FORMAT === "csv") {
+    // deviceCode,temp,humidity,smoke,gas,flame
+    const [deviceCode, temp, humidity, smoke, gas, fire] = line.split(",");
+    if (!deviceCode) return null;
+    return {
+      deviceCode: deviceCode.trim(),
+      temp: Number(temp),
+      humidity: Number(humidity),
+      smoke: Number(smoke),
+      gas: Number(gas),
+      fire: Number(fire),
+    } as ISensorData;
+  }
 
-      try {
-        sensorData = JSON.parse(cleanData);
-      } catch (err) {
-        console.error(
-          "❌ Failed to parse JSON:",
-          (err as Error).message,
-          "| RAW:",
-          JSON.stringify(data),
-        );
-        return;
+  return null;
+}
+
+export const initSensorListener = (): void => {
+  if (env.SERIAL_ENABLED !== "true") {
+    logger.info("Serial ingest disabled (SERIAL_ENABLED=false)");
+    return;
+  }
+
+  serialEvents.on("line", async (raw: string) => {
+    const line = clean(raw);
+    if (!line) return;
+
+    const frame = parseFrame(line);
+    if (!frame) {
+      logger.debug(`Unparsable serial frame: ${JSON.stringify(line)}`);
+      return;
+    }
+
+    try {
+      const result = await ingestReading(frame);
+      if (result.alertCreated) {
+        logger.info(`Alert ${result.alertId} raised from ${frame.deviceCode}`);
       }
-
-      const deviceCode = sensorData.deviceCode;
-
-      const prev = deviceStateMap.get(deviceCode) ?? {
-        lastFire: 0,
-        lastSmoke: false,
-      };
-
-      let shouldAlert = false;
-      let alertType: "fire" | "smoke" | null = null;
-
-      // 🔥 FIRE → trigger on rising edge (0 → 1)
-      if (sensorData.fire === 1 && prev.lastFire === 0) {
-        shouldAlert = true;
-        alertType = "fire";
-      }
-
-      // 💨 SMOKE → SAME LOGIC AS FIRE (NO COOLDOWN)
-      const smokeDetected = sensorData.smoke > SMOKE_THRESHOLD;
-
-      if (smokeDetected && !prev.lastSmoke) {
-        shouldAlert = true;
-        alertType = "smoke";
-      }
-
-      // 🚨 CREATE ALERT
-      if (shouldAlert && alertType) {
-        const alertPayload = {
-          ...sensorData,
-          type: alertType,
-        };
-
-        console.log("🚨 Creating alert:", alertPayload);
-
-        const savedAlert = await createAlert(alertPayload);
-
-        console.log("✅ Alert saved:", savedAlert);
-      }
-
-      // 🔄 UPDATE STATE
-      deviceStateMap.set(deviceCode, {
-        lastFire: sensorData.fire,
-        lastSmoke: smokeDetected,
-      });
     } catch (err) {
-      console.error("❌ Serial listener error:", err);
+      logger.error("Sensor ingest failed", err);
     }
   });
+
+  initSerial();
 };

@@ -1,23 +1,34 @@
 import cors, { CorsOptions } from "cors";
-import { env } from "./env.js";
+import { env, isDev } from "./env.js";
 
-const allowedOrigins =
-  env.NODE_ENV === "production"
-    ? env.CORS_ALLOWED_ORIGINS.split(",")
-    : ["http://localhost:3000", "http://127.0.0.1:3000"];
+/**
+ * Allowed origins come from CORS_ALLOWED_ORIGINS in every environment.
+ * The previous version ignored that variable outside production and hardcoded
+ * port 3000, so running the frontend on any other port broke every request.
+ * In development the localhost check is relaxed to any port.
+ */
+const configured = env.CORS_ALLOWED_ORIGINS.split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
+
+export function isOriginAllowed(origin: string): boolean {
+  if (configured.includes(origin)) return true;
+  if (isDev && LOCALHOST.test(origin)) return true;
+  return false;
+}
 
 const corsOptions: CorsOptions = {
-  origin: (origin, callback) => {
+  origin(origin, callback) {
+    // Same-origin, curl, mobile clients and server-to-server have no Origin.
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error("Not allowed by CORS"));
-    }
+    if (isOriginAllowed(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} is not allowed by CORS`));
   },
-  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization", "Accept"],
+  methods: env.CORS_METHODS.split(",").map((m) => m.trim()),
+  allowedHeaders: env.CORS_HEADERS.split(",").map((h) => h.trim()),
+  exposedHeaders: ["Retry-After"],
   credentials: true,
   optionsSuccessStatus: 204,
 };

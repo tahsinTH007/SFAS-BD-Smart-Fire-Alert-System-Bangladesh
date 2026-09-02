@@ -8,36 +8,36 @@ if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
+const printer = format.printf(({ timestamp, level, message, stack, ...rest }) => {
+  const body =
+    typeof message === "object" ? JSON.stringify(message, null, 2) : message;
+
+  const extras = Object.keys(rest).length
+    ? ` ${JSON.stringify(rest)}`
+    : "";
+
+  return `${timestamp} [${level}] ${stack ?? body}${extras}`;
+});
+
 const fileFormat = format.combine(
   format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
   format.errors({ stack: true }),
-  format.printf(({ timestamp, level, message, stack }) => {
-    const msg =
-      typeof message === "object" ? JSON.stringify(message, null, 2) : message;
-
-    return `${timestamp} [${level.toUpperCase()}] ${stack || msg}`;
-  }),
+  format.uncolorize(),
+  printer,
 );
 
 const consoleFormat = format.combine(
   format.colorize({ level: true }),
-  format.timestamp({ format: "YYYY-MM-DD HH:mm:ss" }),
+  format.timestamp({ format: "HH:mm:ss" }),
   format.errors({ stack: true }),
-  format.printf(({ timestamp, level, message, stack }) => {
-    const msg =
-      typeof message === "object" ? JSON.stringify(message, null, 2) : message;
-
-    return `${timestamp} [${level}] ${stack || msg}`;
-  }),
+  printer,
 );
 
 export const logger = createLogger({
-  level: process.env.NODE_ENV === "development" ? "debug" : "info",
+  level: process.env.LOG_LEVEL ?? (process.env.NODE_ENV === "production" ? "info" : "debug"),
 
   transports: [
-    new transports.Console({
-      format: consoleFormat,
-    }),
+    new transports.Console({ format: consoleFormat }),
 
     new transports.File({
       filename: path.join(logDir, "error.log"),
@@ -60,30 +60,7 @@ export const logger = createLogger({
   exitOnError: false,
 });
 
-
-const originalConsoleLog = console.log.bind(console);
-
-console.log = (...args) => {
-  const message = args
-    .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
-    .join(" ");
-
-  logger.info(message);
-  originalConsoleLog(...args);
-};
-
-console.error = (...args) => {
-  const message = args
-    .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
-    .join(" ");
-
-  logger.error(message);
-};
-
-console.warn = (...args) => {
-  const message = args
-    .map((arg) => (typeof arg === "object" ? JSON.stringify(arg) : arg))
-    .join(" ");
-
-  logger.warn(message);
-};
+// NOTE: this module used to reassign console.log/error/warn to funnel them into
+// winston. That made every console.error invisible in the terminal (it wrote to
+// the log file only) and printed every console.log twice. Call `logger` directly
+// instead — console is left alone.

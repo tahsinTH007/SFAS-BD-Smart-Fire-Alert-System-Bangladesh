@@ -1,88 +1,95 @@
 import { Types } from "mongoose";
-import crypto from "crypto";
+import crypto from "node:crypto";
 import bcrypt from "bcrypt";
-import { DeviceInput, DeviceInputRepo } from "./device.types.js";
+import { BadRequestError } from "../../lib/error.js";
+import type { DeviceInput, DeviceInputRepo } from "./device.types.js";
 
-async function generateHashApiKey() {
-  const apiKey = "sfas_" + crypto.randomBytes(32).toString("hex");
-  const Hash = await bcrypt.hash(apiKey, 12);
-
-  return Hash;
+/**
+ * Generates a device API key and its bcrypt hash.
+ *
+ * The previous version returned only the hash and discarded the plaintext, so
+ * the generated key was unrecoverable and no device could ever authenticate
+ * with it. The caller now receives both: the hash is stored, the plaintext is
+ * shown to the operator once at creation time.
+ */
+export async function generateApiKey(): Promise<{
+  apiKey: string;
+  apiKeyHash: string;
+}> {
+  const apiKey = `sfas_${crypto.randomBytes(32).toString("hex")}`;
+  const apiKeyHash = await bcrypt.hash(apiKey, 12);
+  return { apiKey, apiKeyHash };
 }
 
-export async function prepareDeviceForDb(
-  input: DeviceInput,
-): Promise<{ device: DeviceInputRepo }> {
-  const buildingId = Types.ObjectId.isValid(input.buildingId)
-    ? new Types.ObjectId(input.buildingId)
-    : null;
+export async function verifyApiKey(
+  apiKey: string,
+  apiKeyHash: string,
+): Promise<boolean> {
+  return bcrypt.compare(apiKey, apiKeyHash);
+}
 
-  if (!buildingId) {
-    throw new Error("Invalid buildingId");
+export async function prepareDeviceForDb(input: DeviceInput): Promise<{
+  device: DeviceInputRepo;
+  apiKey: string;
+}> {
+  if (!Types.ObjectId.isValid(input.buildingId)) {
+    throw new BadRequestError("Invalid buildingId");
+  }
+  if (!Types.ObjectId.isValid(input.stationId)) {
+    throw new BadRequestError("Invalid stationId");
   }
 
-  const apiKeyHash = await generateHashApiKey();
-
-  const stationId = Types.ObjectId.isValid(input.stationId)
-    ? new Types.ObjectId(input.stationId)
-    : null;
-
-  if (!stationId) {
-    throw new Error("Invalid stationId");
-  }
-
-  let coordinates: [number, number] | null = null;
-
+  const [lng, lat] = input.coordinates ?? [];
   if (
-    Array.isArray(input.coordinates) &&
-    input.coordinates.length === 2 &&
-    !isNaN(Number(input.coordinates[0])) &&
-    !isNaN(Number(input.coordinates[1]))
+    typeof lng !== "number" ||
+    typeof lat !== "number" ||
+    Number.isNaN(lng) ||
+    Number.isNaN(lat)
   ) {
-    coordinates = [Number(input.coordinates[0]), Number(input.coordinates[1])];
+    throw new BadRequestError(
+      "coordinates must be [longitude, latitude] numbers",
+    );
   }
 
-  if (!coordinates) {
-    throw new Error("Invalid coordinates");
-  }
+  const { apiKey, apiKeyHash } = await generateApiKey();
 
-  const device = {
+  const device: DeviceInputRepo = {
     deviceCode: input.deviceCode.trim(),
-
     apiKeyHash,
 
-    buildingId,
-    stationId,
+    buildingId: new Types.ObjectId(input.buildingId),
+    stationId: new Types.ObjectId(input.stationId),
 
     floor: input.floor,
     room: input.room ?? null,
+    label: input.label ?? null,
 
     status: input.status ?? "active",
     firmwareVersion: input.firmwareVersion ?? "1.0.0",
 
     lastSeenAt: input.lastSeenAt ? new Date(input.lastSeenAt) : undefined,
-
     lastHeartbeatAt: input.lastHeartbeatAt
       ? new Date(input.lastHeartbeatAt)
       : undefined,
 
     lastSensorData: {
       temperature: input.temperature ?? 0,
+      humidity: input.humidity ?? 0,
       smokeLevel: input.smokeLevel ?? 0,
       gasLevel: input.gasLevel ?? 0,
+      flame: 0,
+      riskScore: 0,
+      readAt: null,
     },
 
     location: {
       type: "Point",
-      coordinates,
+      coordinates: [lng, lat],
     },
 
     ipAddress: input.ipAddress ?? null,
-
     installedAt: input.installedAt ? new Date(input.installedAt) : undefined,
   };
 
-  return {
-    device,
-  };
+  return { device, apiKey };
 }

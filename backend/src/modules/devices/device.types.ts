@@ -1,19 +1,28 @@
 import { HydratedDocument, InferSchemaType, Types } from "mongoose";
 import { DeviceSchema } from "../../db/models/device.model.js";
 
+export type DeviceStatus =
+  | "active"
+  | "inactive"
+  | "maintenance"
+  | "compromised";
+
 export type DeviceInput = {
   deviceCode: string;
   buildingId: string;
   stationId: string;
   floor: number;
   room?: string | null;
-  status: "active" | "inactive" | "maintenance" | "compromised";
+  label?: string | null;
+  status: DeviceStatus;
   firmwareVersion: string;
   lastSeenAt?: string | null;
   lastHeartbeatAt?: string | null;
   temperature: number;
+  humidity?: number;
   smokeLevel: number;
   gasLevel: number;
+  /** [longitude, latitude] */
   coordinates: number[];
   ipAddress?: string | null;
   installedAt?: string | null;
@@ -21,23 +30,29 @@ export type DeviceInput = {
 
 export type DeviceInputRepo = {
   deviceCode: string;
+  apiKeyHash: string;
 
   buildingId: Types.ObjectId;
   stationId: Types.ObjectId;
 
-  status: "active" | "inactive" | "maintenance" | "compromised";
+  status: DeviceStatus;
   firmwareVersion: string;
 
   floor: number;
   room?: string | null;
+  label?: string | null;
 
   lastSeenAt?: Date | null;
   lastHeartbeatAt?: Date | null;
 
   lastSensorData?: {
     temperature: number;
+    humidity: number;
     smokeLevel: number;
     gasLevel: number;
+    flame: number;
+    riskScore: number;
+    readAt: Date | null;
   };
 
   location: {
@@ -50,25 +65,13 @@ export type DeviceInputRepo = {
 };
 
 export type DeviceSchemaType = InferSchemaType<typeof DeviceSchema>;
-
 export type DeviceDocument = HydratedDocument<DeviceSchemaType>;
-
-export type DeviceResponse = {
-  id: string;
-  deviceCode: string;
-  buildingId: string;
-  stationId: string;
-  status: string;
-  firmwareVersion: string;
-  floor: number;
-  room?: string | null;
-};
 
 export type GetAllDevicesQuery = {
   page: number;
   limit: number;
   search?: string;
-  status?: "active" | "inactive" | "maintenance" | "compromised";
+  status?: DeviceStatus;
   buildingId?: string;
   floor?: number;
   sortBy: string;

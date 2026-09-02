@@ -1,16 +1,11 @@
-import { Schema, model, Types } from "mongoose";
+import { Schema, model } from "mongoose";
 
 export type AlertPriority = "critical" | "important" | "info";
-
 export type AlertStatus = "active" | "acknowledged" | "resolved";
 
 const alertSchema = new Schema(
   {
-    type: {
-      type: String,
-      required: true,
-      index: true,
-    },
+    type: { type: String, required: true, index: true },
 
     priority: {
       type: String,
@@ -19,79 +14,45 @@ const alertSchema = new Schema(
       index: true,
     },
 
-    title: {
-      type: String,
-      required: true,
-    },
+    title: { type: String, required: true },
+    message: { type: String, required: true },
 
-    message: {
-      type: String,
-      required: true,
-    },
-
-    location: {
-      type: String,
-    },
-
+    location: { type: String },
     reportedBy: String,
-
     contactNumber: String,
 
-    temperature: String,
+    read: { type: Boolean, default: false, index: true },
+    acknowledged: { type: Boolean, default: false },
 
-    read: {
-      type: Boolean,
-      default: false,
-      index: true,
-    },
+    incident: { type: String, index: true },
 
-    acknowledged: {
-      type: Boolean,
-      default: false,
-    },
-
-    incident: {
-      type: String,
-    },
-
-    // ✅ Store as { lat, lng } object — avoids geo index conflicts with plain strings
     coordinates: {
       lat: { type: Number, default: 0 },
       lng: { type: Number, default: 0 },
     },
 
     affectedArea: String,
-
     estimatedPeople: String,
 
-    deviceId: {
-      type: String,
-      index: true,
-    },
+    deviceId: { type: String, index: true },
+    sector: { type: String, index: true },
+    building: { type: String, index: true },
+    floor: { type: String },
+    room: { type: String },
 
-    sector: {
-      type: String,
-      index: true,
-    },
-
-    building: {
-      type: String,
-      index: true,
-    },
-
-    floor: {
-      type: String,
-    },
-
-    room: {
-      type: String,
-    },
-
-    gas: Number,
-
+    // ── Sensor readings at the moment the alert fired ────────────────────────
+    temperature: String,
+    humidity: { type: Number, default: null },
+    smokeLevel: { type: Number, default: 0 },
+    gas: { type: Number, default: 0 },
     gasType: String,
+    flame: { type: Number, default: 0 },
 
-    smokeLevel: Number,
+    /** 0-100 fused multi-sensor confidence that this is a real fire event. */
+    riskScore: { type: Number, default: 0, min: 0, max: 100, index: true },
+
+    /** Which sensors contributed, e.g. ["flame", "smoke", "temperature"]. */
+    riskFactors: { type: [String], default: [] },
 
     status: {
       type: String,
@@ -100,33 +61,36 @@ const alertSchema = new Schema(
       index: true,
     },
 
-    acknowledgedBy: {
-      type: Types.ObjectId,
-      ref: "User",
-    },
-
+    // Operator names (there is no User collection yet, so these are plain
+    // strings rather than dangling ObjectId refs).
+    acknowledgedBy: { type: String, default: null },
     acknowledgedAt: Date,
-
-    resolvedBy: {
-      type: Types.ObjectId,
-      ref: "User",
-    },
-
+    resolvedBy: { type: String, default: null },
     resolvedAt: Date,
+    resolutionNote: { type: String, default: null },
 
-    timestamp: {
-      type: Date,
-      default: Date.now,
-      index: true,
+    /** Free-form operator activity log shown on the alert detail page. */
+    comments: {
+      type: [
+        {
+          author: { type: String, required: true },
+          body: { type: String, required: true },
+          createdAt: { type: Date, default: Date.now },
+        },
+      ],
+      default: [],
     },
+
+    timestamp: { type: Date, default: Date.now, index: true },
   },
-  {
-    timestamps: true,
-  },
+  { timestamps: true },
 );
 
 alertSchema.index({ status: 1, priority: 1 });
 alertSchema.index({ sector: 1, building: 1, floor: 1 });
 alertSchema.index({ createdAt: -1 });
+alertSchema.index({ deviceId: 1, createdAt: -1 });
+// Text index powers the notifications search box.
+alertSchema.index({ title: "text", message: "text", location: "text" });
 
 export const Alert = model("Alert", alertSchema);

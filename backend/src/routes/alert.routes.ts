@@ -3,11 +3,28 @@ import * as AlertController from "../modules/alerts/alert.controller.js";
 
 export const alertsRouter = Router();
 
-// GET    /api/v1/alerts
+// ── Analytics (must precede /:id so "stats" isn't read as an id) ────────────
+alertsRouter.get("/stats", AlertController.getStats);
+alertsRouter.get("/timeseries", AlertController.getTimeseries);
+alertsRouter.get("/top-devices", AlertController.getTopDevices);
+
+// ── Bulk operations ─────────────────────────────────────────────────────────
+alertsRouter.patch("/bulk/read", AlertController.bulkMarkRead);
+alertsRouter.patch("/bulk/acknowledge", AlertController.bulkAcknowledge);
+alertsRouter.post("/bulk/delete", AlertController.bulkDelete);
+
+// ── Collection ──────────────────────────────────────────────────────────────
 alertsRouter.get("/", AlertController.getAllAlerts);
-
-// GET    /api/v1/alerts/:alertId
-alertsRouter.get("/:id", AlertController.getSingleAlert);
-
-// GET    /api/v1/alerts/priority/:priority
 alertsRouter.get("/priority/:priority", AlertController.getAlertsByType);
+
+// ── Single alert ────────────────────────────────────────────────────────────
+alertsRouter.get("/:id", AlertController.getSingleAlert);
+alertsRouter.get("/:id/related", AlertController.getRelatedAlerts);
+
+alertsRouter.patch("/:id/read", AlertController.markRead);
+alertsRouter.patch("/:id/acknowledge", AlertController.acknowledgeAlert);
+alertsRouter.patch("/:id/resolve", AlertController.resolveAlert);
+alertsRouter.patch("/:id/reopen", AlertController.reopenAlert);
+alertsRouter.post("/:id/comments", AlertController.addComment);
+
+alertsRouter.delete("/:id", AlertController.deleteAlert);
