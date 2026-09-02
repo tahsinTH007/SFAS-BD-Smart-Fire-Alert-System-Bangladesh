@@ -9,6 +9,8 @@ import "./models/building.model.js";
 import "./models/device.model.js";
 import "./models/alert.models.js";
 import "./models/reading.model.js";
+import "./models/unit.model.js";
+import "./models/dispatch.model.js";
 
 mongoose.set("strictQuery", true);
 

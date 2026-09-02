@@ -56,6 +56,10 @@ const envSchema = z.object({
   TEMP_THRESHOLD: z.string().default("50"),
   ALERT_DEDUPE_WINDOW_MS: z.string().default("60000"),
 
+  // Routing — optional. Set to an OSRM instance (e.g. http://localhost:5000)
+  // for real road routes; without it ETAs are estimated locally.
+  ROUTING_OSRM_URL: z.string().url().optional(),
+
   // Redis
   REDIS_USERNAME: z.string().optional().default(""),
   REDIS_PASSWORD: z.string().optional().default(""),

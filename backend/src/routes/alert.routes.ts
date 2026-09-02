@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as AlertController from "../modules/alerts/alert.controller.js";
+import * as UnitController from "../modules/units/unit.controller.js";
 
 export const alertsRouter = Router();
 
@@ -26,5 +27,10 @@ alertsRouter.patch("/:id/acknowledge", AlertController.acknowledgeAlert);
 alertsRouter.patch("/:id/resolve", AlertController.resolveAlert);
 alertsRouter.patch("/:id/reopen", AlertController.reopenAlert);
 alertsRouter.post("/:id/comments", AlertController.addComment);
+
+// ── Dispatch ────────────────────────────────────────────────────────────────
+alertsRouter.get("/:id/units/recommend", UnitController.recommendUnits);
+alertsRouter.get("/:id/dispatches", UnitController.getAlertDispatches);
+alertsRouter.post("/:id/dispatch", UnitController.dispatchUnits);
 
 alertsRouter.delete("/:id", AlertController.deleteAlert);

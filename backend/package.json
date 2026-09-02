@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "tsx src/scripts/seed.ts",
     "simulate": "tsx src/scripts/simulate.ts",
-    "backfill:station": "tsx src/scripts/backfill-station.ts"
+    "backfill:station": "tsx src/scripts/backfill-station.ts",
+    "seed:units": "tsx src/scripts/seed-units.ts"
   },
   "keywords": [],
   "author": "",
