@@ -10,6 +10,7 @@ export const devicesRouter = Router();
 
 devicesRouter.get("/stats", DeviceController.getDeviceStats);
 devicesRouter.get("/telemetry", DeviceController.getLiveTelemetry);
+devicesRouter.get("/readings", DeviceController.getRecentReadings);
 
 devicesRouter.post("/heartbeat", checkHeartbeatRateLimit, DeviceController.heartbeat);
 

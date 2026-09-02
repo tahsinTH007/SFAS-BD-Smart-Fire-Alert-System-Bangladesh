@@ -87,6 +87,7 @@ export const getAllDevicesQuerySchema = z.object({
     .optional()
     .transform((v) => Math.min(200, Math.max(1, parseInt(v || "20", 10) || 20))),
   search: z.string().max(100).optional(),
+  stationId: z.string().max(64).optional(),
   status: deviceStatusSchema.optional(),
   buildingId: z.string().optional(),
   floor: z
@@ -101,6 +102,7 @@ export const getAllDevicesQuerySchema = z.object({
 });
 
 export const readingsQuerySchema = z.object({
+  stationId: z.string().max(64).optional(),
   limit: z
     .string()
     .optional()
@@ -128,4 +130,8 @@ export const sensorReadingSchema = z.object({
   sector: z.string().max(100).optional(),
   floor: z.number().int().optional(),
   room: z.string().max(50).optional(),
+});
+
+export const deviceScopeSchema = z.object({
+  stationId: z.string().max(64).optional(),
 });

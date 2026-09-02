@@ -35,9 +35,11 @@ function toQuery(params: Record<string, unknown>): Record<string, string> {
 }
 
 export const alertApi = {
-  /** Flat list (no params) — used by the live map and notification views. */
-  getAllAlerts: async (): Promise<AlertResponse[]> => {
-    const res = await axiosClient.get<Envelope<AlertResponse[]>>("/alerts");
+  /** Flat list for one station — used by the live map and notification views. */
+  getAllAlerts: async (stationId?: string): Promise<AlertResponse[]> => {
+    const res = await axiosClient.get<Envelope<AlertResponse[]>>("/alerts", {
+      params: toQuery({ stationId }),
+    });
     return res.data.data;
   },
 
@@ -65,9 +67,13 @@ export const alertApi = {
     return res.data.data;
   },
 
-  getAlertsByPriority: async (priority: string): Promise<AlertResponse[]> => {
+  getAlertsByPriority: async (
+    priority: string,
+    stationId?: string,
+  ): Promise<AlertResponse[]> => {
     const res = await axiosClient.get<Envelope<AlertResponse[]>>(
       `/alerts/priority/${priority}`,
+      { params: toQuery({ stationId }) },
     );
     return res.data.data;
   },
@@ -81,23 +87,31 @@ export const alertApi = {
 
   // ── Analytics ──────────────────────────────────────────────────────────────
 
-  getStats: async (): Promise<AlertStats> => {
-    const res = await axiosClient.get<Envelope<AlertStats>>("/alerts/stats");
+  getStats: async (stationId?: string): Promise<AlertStats> => {
+    const res = await axiosClient.get<Envelope<AlertStats>>("/alerts/stats", {
+      params: toQuery({ stationId }),
+    });
     return res.data.data;
   },
 
-  getTimeseries: async (hours = 24): Promise<TimeseriesPoint[]> => {
+  getTimeseries: async (
+    hours = 24,
+    stationId?: string,
+  ): Promise<TimeseriesPoint[]> => {
     const res = await axiosClient.get<Envelope<TimeseriesPoint[]>>(
       "/alerts/timeseries",
-      { params: { hours } },
+      { params: toQuery({ hours, stationId }) },
     );
     return res.data.data;
   },
 
-  getTopDevices: async (limit = 5): Promise<TopDevice[]> => {
+  getTopDevices: async (
+    limit = 5,
+    stationId?: string,
+  ): Promise<TopDevice[]> => {
     const res = await axiosClient.get<Envelope<TopDevice[]>>(
       "/alerts/top-devices",
-      { params: { limit } },
+      { params: toQuery({ limit, stationId }) },
     );
     return res.data.data;
   },

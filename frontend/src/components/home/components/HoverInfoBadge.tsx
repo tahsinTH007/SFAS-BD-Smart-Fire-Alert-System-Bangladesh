@@ -23,7 +23,7 @@ export const HoverInfoBadge: React.FC<HoverInfoBadgeProps> = ({ alert }) => {
 
   return (
     <div
-      className="absolute bottom-6 right-6 z-10 bg-slate-900 border border-slate-800 rounded-xl px-4 py-3 shadow-xl flex items-center gap-3"
+      className="pointer-events-none absolute bottom-6 right-6 z-[900] hidden bg-slate-900 lg:flex border border-slate-800 rounded-xl px-4 py-3 shadow-xl items-center gap-3"
       style={{
         borderLeftColor: cfg.markerColor,
         borderLeftWidth: "3px",

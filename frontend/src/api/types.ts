@@ -40,6 +40,8 @@ export interface AlertResponse {
   riskFactors: string[];
 
   deviceId: string | null;
+  stationId: string | null;
+  buildingId: string | null;
   sector: string | null;
   building: string | null;
   floor: string | null;

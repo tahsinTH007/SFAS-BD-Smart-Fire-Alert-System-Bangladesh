@@ -9,7 +9,8 @@
     "start": "node dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "seed": "tsx src/scripts/seed.ts",
-    "simulate": "tsx src/scripts/simulate.ts"
+    "simulate": "tsx src/scripts/simulate.ts",
+    "backfill:station": "tsx src/scripts/backfill-station.ts"
   },
   "keywords": [],
   "author": "",

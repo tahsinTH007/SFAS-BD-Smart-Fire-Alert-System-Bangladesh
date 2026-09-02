@@ -15,7 +15,11 @@ export const NotificationItem: React.FC<NotificationItemProps> = ({
   onRead,
   onClose,
 }) => {
-  const config = PRIORITY_CONFIG[notification.priority];
+  // priority arrives as a plain string from the API; fall back rather than
+  // indexing a Record<Priority, …> with an arbitrary key.
+  const config =
+    PRIORITY_CONFIG[notification.priority as keyof typeof PRIORITY_CONFIG] ??
+    PRIORITY_CONFIG.info;
 
   const handleClick = () => {
     onRead(notification.id);

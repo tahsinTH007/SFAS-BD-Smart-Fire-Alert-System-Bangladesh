@@ -1,4 +1,4 @@
-import { Priority } from "../types/notification";
+import { Priority } from "@/components/notifications/types/notification";
 
 interface PriorityStyle {
   label: string;

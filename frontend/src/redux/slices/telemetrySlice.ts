@@ -1,7 +1,8 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { deviceApi } from "@/api/systemApi";
 import { toApiError } from "@/lib/axiosClient";
-import type { DeviceStats, TelemetryDevice } from "@/api/types";
+import type { DeviceStats, ReadingPoint, TelemetryDevice } from "@/api/types";
+import type { RootState } from "../store";
 
 /** A reading pushed over the socket. */
 export interface LiveReading {
@@ -24,10 +25,10 @@ const HISTORY_LIMIT = 40;
 export const fetchTelemetry = createAsyncThunk<
   TelemetryDevice[],
   void,
-  { rejectValue: string }
->("telemetry/fetch", async (_, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("telemetry/fetch", async (_, { rejectWithValue, getState }) => {
   try {
-    return await deviceApi.telemetry();
+    return await deviceApi.telemetry(getState().session.stationId ?? undefined);
   } catch (err) {
     return rejectWithValue(toApiError(err).message);
   }
@@ -36,10 +37,25 @@ export const fetchTelemetry = createAsyncThunk<
 export const fetchDeviceStats = createAsyncThunk<
   DeviceStats,
   void,
-  { rejectValue: string }
->("telemetry/stats", async (_, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("telemetry/stats", async (_, { rejectWithValue, getState }) => {
   try {
-    return await deviceApi.stats();
+    return await deviceApi.stats(getState().session.stationId ?? undefined);
+  } catch (err) {
+    return rejectWithValue(toApiError(err).message);
+  }
+});
+
+export const seedHistory = createAsyncThunk<
+  Record<string, ReadingPoint[]>,
+  void,
+  { rejectValue: string; state: RootState }
+>("telemetry/seedHistory", async (_, { rejectWithValue, getState }) => {
+  try {
+    return await deviceApi.recentReadings(
+      HISTORY_LIMIT,
+      getState().session.stationId ?? undefined,
+    );
   } catch (err) {
     return rejectWithValue(toApiError(err).message);
   }
@@ -113,6 +129,32 @@ const telemetrySlice = createSlice({
       })
       .addCase(fetchDeviceStats.fulfilled, (state, action) => {
         state.stats = action.payload;
+      })
+      // Prime the sparklines from stored readings so the cards show a trend on
+      // first paint instead of waiting ~40s for live pushes to accumulate.
+      .addCase(seedHistory.fulfilled, (state, action) => {
+        for (const [deviceCode, readings] of Object.entries(action.payload)) {
+          if (state.history[deviceCode]?.length) continue;
+          state.history[deviceCode] = readings.map((r) => ({
+            deviceCode,
+            temperature: r.temperature,
+            humidity: r.humidity,
+            smoke: r.smoke,
+            gas: r.gas,
+            flame: r.flame,
+            riskScore: r.riskScore,
+            riskFactors: r.riskFactors ?? [],
+            priority:
+              r.riskScore >= 70
+                ? "critical"
+                : r.riskScore >= 40
+                  ? "important"
+                  : "info",
+            kind: "",
+            summary: "",
+            recordedAt: r.recordedAt,
+          }));
+        }
       });
   },
 });

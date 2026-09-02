@@ -37,6 +37,8 @@ export type Alert = {
 
   status: "active" | "acknowledged" | "resolved";
   deviceId: string | null;
+  stationId: string | null;
+  buildingId: string | null;
   sector: string | null;
   building: string | null;
   floor: string | null;
@@ -59,6 +61,8 @@ export type AlertResponse = Alert;
 export interface AlertQuery {
   page: number;
   limit: number;
+  /** Scopes every read to one fire station's coverage area. */
+  stationId?: string;
   priority?: string;
   status?: string;
   type?: string;

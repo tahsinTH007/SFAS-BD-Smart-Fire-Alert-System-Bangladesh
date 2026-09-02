@@ -43,12 +43,31 @@ export const deviceApi = {
   get: async (id: string): Promise<Device> =>
     (await axiosClient.get<Envelope<Device>>(`/devices/${id}`)).data.data,
 
-  stats: async (): Promise<DeviceStats> =>
-    (await axiosClient.get<Envelope<DeviceStats>>("/devices/stats")).data.data,
+  stats: async (stationId?: string): Promise<DeviceStats> =>
+    (
+      await axiosClient.get<Envelope<DeviceStats>>("/devices/stats", {
+        params: { stationId },
+      })
+    ).data.data,
 
-  telemetry: async (): Promise<TelemetryDevice[]> =>
-    (await axiosClient.get<Envelope<TelemetryDevice[]>>("/devices/telemetry"))
-      .data.data,
+  telemetry: async (stationId?: string): Promise<TelemetryDevice[]> =>
+    (
+      await axiosClient.get<Envelope<TelemetryDevice[]>>("/devices/telemetry", {
+        params: { stationId },
+      })
+    ).data.data,
+
+  /** Recent history for every device at once, keyed by device code. */
+  recentReadings: async (
+    limit = 40,
+    stationId?: string,
+  ): Promise<Record<string, ReadingPoint[]>> =>
+    (
+      await axiosClient.get<Envelope<Record<string, ReadingPoint[]>>>(
+        "/devices/readings",
+        { params: { limit, stationId } },
+      )
+    ).data.data,
 
   readings: async (deviceCode: string, limit = 60): Promise<ReadingPoint[]> =>
     (
@@ -89,9 +108,12 @@ export const buildingApi = {
   get: async (id: string): Promise<Building> =>
     (await axiosClient.get<Envelope<Building>>(`/buildings/${id}`)).data.data,
 
-  stats: async (): Promise<BuildingStats> =>
-    (await axiosClient.get<Envelope<BuildingStats>>("/buildings/stats")).data
-      .data,
+  stats: async (stationId?: string): Promise<BuildingStats> =>
+    (
+      await axiosClient.get<Envelope<BuildingStats>>("/buildings/stats", {
+        params: { stationId },
+      })
+    ).data.data,
 
   create: async (body: Record<string, unknown>): Promise<Building> =>
     (await axiosClient.post<Envelope<Building>>("/buildings", body)).data.data,

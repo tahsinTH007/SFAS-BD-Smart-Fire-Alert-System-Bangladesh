@@ -54,6 +54,8 @@ async function resolveDeviceContext(deviceCode: string) {
   const coords = device.location?.coordinates ?? building?.location?.coordinates;
 
   return {
+    stationId: device.stationId ?? building?.stationId ?? null,
+    buildingId: building?._id ?? null,
     // GeoJSON stores [lng, lat]; alerts store lat/lng.
     coordinates: coords ? `${coords[1]},${coords[0]}` : undefined,
     location: building
@@ -119,6 +121,8 @@ export async function createAlert(
     riskFactors: a?.factors ?? [],
 
     deviceId: params.deviceCode,
+    stationId: context?.stationId ?? null,
+    buildingId: context?.buildingId ?? null,
     building: params.building ?? context?.building ?? null,
     sector: params.sector ?? context?.sector ?? null,
     floor: params.floor ?? context?.floor ?? null,
@@ -130,6 +134,10 @@ export async function createAlert(
 
   const alert = await repoCreateAlert(payload);
 
+  // Station room first: that is the socket every deployed console listens on.
+  if (context?.stationId) {
+    emitToRoom(`station:${context.stationId}`, "alert:new", alert);
+  }
   emitToAll("alert:new", alert);
   if (alert.building) {
     emitToRoom(`building:${alert.building}`, "alert:new", alert);
@@ -154,8 +162,8 @@ export async function getAlerts(query: AlertQuery) {
   };
 }
 
-export async function getAllAlerts(): Promise<AlertResponse[]> {
-  return repoGetAllAlerts();
+export async function getAllAlerts(stationId?: string): Promise<AlertResponse[]> {
+  return repoGetAllAlerts(stationId);
 }
 
 export async function getSingleAlert(id: string): Promise<AlertResponse> {
@@ -166,24 +174,25 @@ export async function getSingleAlert(id: string): Promise<AlertResponse> {
 
 export async function getAlertsByType(
   priority: string,
+  stationId?: string,
 ): Promise<AlertResponse[]> {
-  return repoGetAlertsByType(priority);
+  return repoGetAlertsByType(priority, stationId);
 }
 
 export async function getRelatedAlerts(id: string) {
   return repoGetRelated(id);
 }
 
-export async function getStats() {
-  return repoGetStats();
+export async function getStats(stationId?: string) {
+  return repoGetStats(stationId);
 }
 
-export async function getTimeseries(hours: number) {
-  return repoGetTimeseries(hours);
+export async function getTimeseries(hours: number, stationId?: string) {
+  return repoGetTimeseries(hours, stationId);
 }
 
-export async function getTopDevices(limit: number) {
-  return repoGetTopDevices(limit);
+export async function getTopDevices(limit: number, stationId?: string) {
+  return repoGetTopDevices(limit, stationId);
 }
 
 // ─── Mutations ────────────────────────────────────────────────────────────────

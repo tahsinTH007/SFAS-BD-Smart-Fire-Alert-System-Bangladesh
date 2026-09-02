@@ -2,6 +2,7 @@ import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { alertApi } from "@/api/alertApi";
 import { toApiError } from "@/lib/axiosClient";
 import type { AlertResponse, AlertStats } from "@/api/types";
+import type { RootState } from "../store";
 
 /**
  * Every mutation goes through the API and stores the server's response.
@@ -17,10 +18,11 @@ const asError = (err: unknown) => toApiError(err).message;
 export const fetchAlerts = createAsyncThunk<
   AlertResponse[],
   void,
-  { rejectValue: string }
->("alerts/fetchAlerts", async (_, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("alerts/fetchAlerts", async (_, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.getAllAlerts();
+    // Every read is scoped to the station this console is deployed for.
+    return await alertApi.getAllAlerts(getState().session.stationId ?? undefined);
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -41,10 +43,13 @@ export const fetchAlertById = createAsyncThunk<
 export const fetchAlertsByPriority = createAsyncThunk<
   AlertResponse[],
   string,
-  { rejectValue: string }
->("alerts/fetchAlertsByPriority", async (priority, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("alerts/fetchAlertsByPriority", async (priority, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.getAlertsByPriority(priority);
+    return await alertApi.getAlertsByPriority(
+      priority,
+      (getState() as RootState).session.stationId ?? undefined,
+    );
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -53,10 +58,10 @@ export const fetchAlertsByPriority = createAsyncThunk<
 export const fetchAlertStats = createAsyncThunk<
   AlertStats,
   void,
-  { rejectValue: string }
->("alerts/fetchStats", async (_, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("alerts/fetchStats", async (_, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.getStats();
+    return await alertApi.getStats(getState().session.stationId ?? undefined);
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -77,10 +82,13 @@ export const markAlertRead = createAsyncThunk<
 export const acknowledgeAlert = createAsyncThunk<
   AlertResponse,
   string,
-  { rejectValue: string }
->("alerts/acknowledge", async (id, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("alerts/acknowledge", async (id, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.acknowledge(id);
+    return await alertApi.acknowledge(
+      id,
+      (getState() as RootState).session.operator.name,
+    );
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -89,10 +97,14 @@ export const acknowledgeAlert = createAsyncThunk<
 export const resolveAlert = createAsyncThunk<
   AlertResponse,
   { id: string; note?: string },
-  { rejectValue: string }
->("alerts/resolve", async ({ id, note }, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("alerts/resolve", async ({ id, note }, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.resolve(id, note);
+    return await alertApi.resolve(
+      id,
+      note,
+      (getState() as RootState).session.operator.name,
+    );
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -113,10 +125,14 @@ export const reopenAlert = createAsyncThunk<
 export const addAlertComment = createAsyncThunk<
   AlertResponse,
   { id: string; body: string },
-  { rejectValue: string }
->("alerts/addComment", async ({ id, body }, { rejectWithValue }) => {
+  { rejectValue: string; state: RootState }
+>("alerts/addComment", async ({ id, body }, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.addComment(id, body);
+    return await alertApi.addComment(
+      id,
+      body,
+      (getState() as RootState).session.operator.name,
+    );
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -152,9 +168,12 @@ export const bulkAcknowledge = createAsyncThunk<
   string[],
   string[],
   { rejectValue: string }
->("alerts/bulkAcknowledge", async (ids, { rejectWithValue }) => {
+>("alerts/bulkAcknowledge", async (ids, { rejectWithValue, getState }) => {
   try {
-    await alertApi.bulkAcknowledge(ids);
+    await alertApi.bulkAcknowledge(
+      ids,
+      (getState() as RootState).session.operator.name,
+    );
     return ids;
   } catch (err) {
     return rejectWithValue(asError(err));
@@ -185,6 +204,12 @@ interface AlertState {
   mutating: boolean;
   error: string | null;
   lastSyncedAt: string | null;
+  /**
+   * Alerts that arrived over the socket while this console was open.
+   * Only these (plus genuinely recent ones) earn a full-screen takeover — a
+   * backlog of old unacknowledged alerts must not blockade the screen on load.
+   */
+  liveIds: string[];
 }
 
 const initialState: AlertState = {
@@ -196,6 +221,7 @@ const initialState: AlertState = {
   mutating: false,
   error: null,
   lastSyncedAt: null,
+  liveIds: [],
 };
 
 function upsert(state: AlertState, alert: AlertResponse) {
@@ -214,6 +240,11 @@ const alertSlice = createSlice({
     alertReceived: (state, action: PayloadAction<AlertResponse>) => {
       if (!state.alerts.some((a) => a.id === action.payload.id)) {
         state.alerts.unshift(action.payload);
+      }
+      if (!state.liveIds.includes(action.payload.id)) {
+        state.liveIds.push(action.payload.id);
+        // Bounded — this only feeds the banner's "arrived just now" check.
+        if (state.liveIds.length > 100) state.liveIds.shift();
       }
     },
     /** Socket push: an alert changed elsewhere. */

@@ -1,18 +1,30 @@
-import { useState, useMemo, useEffect } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { AppDispatch, RootState } from "@/redux/store";
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "@/redux/store";
 import {
+  acknowledgeAlert,
+  bulkAcknowledge,
+  bulkMarkRead,
+  bulkRemove,
   fetchAlerts,
-  updateAlert,
-  deleteAlert,
+  markAlertRead,
+  removeAlert,
+  resolveAlert,
 } from "@/redux/slices/alertSlice";
-import { AlertResponse } from "@/api/alertApi";
-import { Notification } from "../types/notification";
+import type { AlertResponse } from "@/api/types";
+import type {
+  FilterPriority,
+  FilterReadStatus,
+  Notification,
+} from "../types/notification";
 
-export type Priority = "critical" | "important" | "info" | "all";
-export type FilterReadStatus = "all" | "read" | "unread";
+export type Priority = FilterPriority;
+export type { FilterReadStatus };
 
-function mapAlertToNotification(alert: AlertResponse): Notification {
+function toNotification(alert: AlertResponse): Notification {
   return {
     id: String(alert.id),
     type: alert.type,
@@ -20,122 +32,188 @@ function mapAlertToNotification(alert: AlertResponse): Notification {
     title: alert.title,
     message: alert.message,
     location: alert.location,
-    reportedBy: alert.reportedBy ?? "Unknown",
+    reportedBy: alert.reportedBy,
     contactNumber: alert.contactNumber,
     timestamp: alert.timestamp,
     read: alert.read,
     acknowledged: alert.acknowledged,
+    status: alert.status,
+    riskScore: alert.riskScore,
+    riskFactors: alert.riskFactors,
+    deviceId: alert.deviceId,
+    building: alert.building,
+    incident: alert.incident,
   };
 }
 
 export const useNotifications = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { alerts, loading, error } = useSelector(
-    (state: RootState) => state.alerts,
+  const { alerts, loading, error, mutating } = useSelector(
+    (s: RootState) => s.alerts,
   );
 
-  const notifications: Notification[] = useMemo(
-    () => alerts.map(mapAlertToNotification),
-    [alerts],
-  );
-
-  const [search, setSearch] = useState<string>("");
-  const [filterPriority, setFilterPriority] = useState<Priority>("all");
+  const [search, setSearch] = useState("");
+  const [filterPriority, setFilterPriority] = useState<FilterPriority>("all");
   const [filterRead, setFilterRead] = useState<FilterReadStatus>("all");
+  const [filterStatus, setFilterStatus] = useState<string>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    dispatch(fetchAlerts());
+    void dispatch(fetchAlerts());
   }, [dispatch]);
 
+  const notifications: Notification[] = useMemo(
+    () => alerts.map(toNotification),
+    [alerts],
+  );
+
   const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+
     return notifications.filter((n) => {
       if (filterPriority !== "all" && n.priority !== filterPriority)
         return false;
       if (filterRead === "read" && !n.read) return false;
       if (filterRead === "unread" && n.read) return false;
+      if (filterStatus !== "all" && n.status !== filterStatus) return false;
 
-      const searchLower = search.toLowerCase();
-      if (
-        search &&
-        !(
-          n.title.toLowerCase().includes(searchLower) ||
-          n.message.toLowerCase().includes(searchLower) ||
-          (n.location?.toLowerCase().includes(searchLower) ?? false)
-        )
-      )
-        return false;
-
-      return true;
+      if (!q) return true;
+      return [n.title, n.message, n.location, n.deviceId, n.incident]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q));
     });
-  }, [notifications, search, filterPriority, filterRead]);
+  }, [notifications, search, filterPriority, filterRead, filterStatus]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
   const criticalUnread = notifications.filter(
     (n) => !n.read && n.priority === "critical",
   ).length;
-  const counts = {
-    critical: notifications.filter((n) => n.priority === "critical").length,
-    important: notifications.filter((n) => n.priority === "important").length,
-    info: notifications.filter((n) => n.priority === "info").length,
-  };
 
-  const toggleSelect = (id: string) => {
+  const counts = useMemo(
+    () => ({
+      critical: notifications.filter((n) => n.priority === "critical").length,
+      important: notifications.filter((n) => n.priority === "important").length,
+      info: notifications.filter((n) => n.priority === "info").length,
+    }),
+    [notifications],
+  );
+
+  const unreadCounts = useMemo(
+    () => ({
+      critical: notifications.filter(
+        (n) => n.priority === "critical" && !n.read,
+      ).length,
+      important: notifications.filter(
+        (n) => n.priority === "important" && !n.read,
+      ).length,
+      info: notifications.filter((n) => n.priority === "info" && !n.read).length,
+    }),
+    [notifications],
+  );
+
+  // ── Selection ──────────────────────────────────────────────────────────────
+
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const selectAll = () => {
-    if (selectedIds.size === filtered.length) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(filtered.map((n) => String(n.id))));
+  const selectAll = useCallback(() => {
+    setSelectedIds((prev) =>
+      prev.size === filtered.length
+        ? new Set()
+        : new Set(filtered.map((n) => n.id)),
+    );
+  }, [filtered]);
+
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), []);
+
+  // ── Actions (all persisted through the API) ────────────────────────────────
+
+  const markRead = useCallback(
+    async (id: string) => {
+      await dispatch(markAlertRead({ id, read: true }));
+    },
+    [dispatch],
+  );
+
+  const acknowledge = useCallback(
+    async (id: string) => {
+      const res = await dispatch(acknowledgeAlert(id));
+      if (acknowledgeAlert.fulfilled.match(res)) toast.success("Alert acknowledged");
+    },
+    [dispatch],
+  );
+
+  const resolve = useCallback(
+    async (id: string, note?: string) => {
+      const res = await dispatch(resolveAlert({ id, note }));
+      if (resolveAlert.fulfilled.match(res)) toast.success("Alert resolved");
+    },
+    [dispatch],
+  );
+
+  const deleteOne = useCallback(
+    async (id: string) => {
+      const res = await dispatch(removeAlert(id));
+      if (removeAlert.fulfilled.match(res)) {
+        toast.success("Alert deleted");
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          next.delete(id);
+          return next;
+        });
+      }
+    },
+    [dispatch],
+  );
+
+  const markAllRead = useCallback(async () => {
+    const ids = notifications.filter((n) => !n.read).map((n) => n.id);
+    if (!ids.length) return;
+    const res = await dispatch(bulkMarkRead(ids));
+    if (bulkMarkRead.fulfilled.match(res)) {
+      toast.success(`${ids.length} alert(s) marked read`);
     }
-  };
+  }, [dispatch, notifications]);
 
-  const markAllRead = () => {
-    alerts.forEach((a) => {
-      if (!a.read) dispatch(updateAlert({ ...a, read: true }));
-    });
-  };
+  const markSelectedRead = useCallback(async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    const res = await dispatch(bulkMarkRead(ids));
+    if (bulkMarkRead.fulfilled.match(res)) {
+      toast.success(`${ids.length} alert(s) marked read`);
+      clearSelection();
+    }
+  }, [dispatch, selectedIds, clearSelection]);
 
-  const markSelectedRead = () => {
-    alerts.forEach((a) => {
-      if (selectedIds.has(String(a.id)) && !a.read)
-        dispatch(updateAlert({ ...a, read: true }));
-    });
-    setSelectedIds(new Set());
-  };
+  const acknowledgeSelected = useCallback(async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    const res = await dispatch(bulkAcknowledge(ids));
+    if (bulkAcknowledge.fulfilled.match(res)) {
+      toast.success(`${ids.length} alert(s) acknowledged`);
+      clearSelection();
+    }
+  }, [dispatch, selectedIds, clearSelection]);
 
-  const acknowledge = (id: string) => {
-    const alert = alerts.find((a) => a.id === id);
-    if (alert)
-      dispatch(updateAlert({ ...alert, acknowledged: true, read: true }));
-  };
+  const deleteSelected = useCallback(async () => {
+    const ids = [...selectedIds];
+    if (!ids.length) return;
+    const res = await dispatch(bulkRemove(ids));
+    if (bulkRemove.fulfilled.match(res)) {
+      toast.success(`${ids.length} alert(s) deleted`);
+      clearSelection();
+    }
+  }, [dispatch, selectedIds, clearSelection]);
 
-  const markRead = (id: string) => {
-    const alert = alerts.find((a) => a.id === id);
-    if (alert) dispatch(updateAlert({ ...alert, read: true }));
-  };
+  const refresh = useCallback(() => dispatch(fetchAlerts()), [dispatch]);
 
-  const deleteOne = (id: string) => {
-    dispatch(deleteAlert(id));
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      next.delete(id);
-      return next;
-    });
-  };
-
-  const deleteSelected = () => {
-    selectedIds.forEach((id) => dispatch(deleteAlert(id)));
-    setSelectedIds(new Set());
-  };
-
-  const clearSearch = () => setSearch("");
+  const clearSearch = useCallback(() => setSearch(""), []);
 
   return {
     notifications,
@@ -144,27 +222,38 @@ export const useNotifications = () => {
     search,
     filterPriority,
     filterRead,
+    filterStatus,
     selectedIds,
 
     unreadCount,
     criticalUnread,
     counts,
+    unreadCounts,
 
     loading,
+    mutating,
     error,
 
     setSearch,
     setFilterPriority,
     setFilterRead,
+    setFilterStatus,
 
     toggleSelect,
     selectAll,
+    clearSelection,
+
     markAllRead,
     markSelectedRead,
+    acknowledgeSelected,
+    deleteSelected,
+
     acknowledge,
+    resolve,
     markRead,
     deleteOne,
-    deleteSelected,
+
+    refresh,
     clearSearch,
   };
 };

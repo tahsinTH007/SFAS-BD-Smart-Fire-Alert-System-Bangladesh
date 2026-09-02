@@ -7,6 +7,7 @@ import type { AppDispatch, RootState } from "@/redux/store";
 import {
   fetchDeviceStats,
   fetchTelemetry,
+  seedHistory,
 } from "@/redux/slices/telemetrySlice";
 import { fetchAlertStats } from "@/redux/slices/alertSlice";
 import { alertApi } from "@/api/alertApi";
@@ -32,6 +33,7 @@ export const useDashboard = () => {
   const dispatch = useDispatch<AppDispatch>();
 
   const alertStats = useSelector((s: RootState) => s.alerts.stats);
+  const stationId = useSelector((s: RootState) => s.session.stationId);
   const { devices: telemetry, stats: deviceStats, history, connected } =
     useSelector((s: RootState) => s.telemetry);
 
@@ -53,11 +55,14 @@ export const useDashboard = () => {
 
   const loadCore = useCallback(async () => {
     try {
+      // Devices and buildings are scoped to this console's station; the station
+      // list itself stays unscoped so Settings can offer the others.
+      const scope = stationId ?? undefined;
       const [d, b, s, bs] = await Promise.all([
-        deviceApi.list({ limit: 200 }),
-        buildingApi.list({ limit: 200 }),
+        deviceApi.list({ limit: 200, stationId: scope }),
+        buildingApi.list({ limit: 200, stationId: scope }),
         stationApi.list({ limit: 200 }),
-        buildingApi.stats(),
+        buildingApi.stats(scope),
       ]);
       setDevices(d.items);
       setBuildings(b.items);
@@ -67,20 +72,23 @@ export const useDashboard = () => {
     } catch (err) {
       setError(toApiError(err).message);
     }
-  }, []);
+  }, [stationId]);
 
-  const loadAnalytics = useCallback(async (hours: number) => {
+  const loadAnalytics = useCallback(
+    async (hours: number) => {
     try {
       const [ts, top] = await Promise.all([
-        alertApi.getTimeseries(hours),
-        alertApi.getTopDevices(6),
+        alertApi.getTimeseries(hours, stationId ?? undefined),
+        alertApi.getTopDevices(6, stationId ?? undefined),
       ]);
       setTimeseries(ts);
       setTopDevices(top);
     } catch {
       // Analytics are supplementary; the rest of the dashboard still renders.
     }
-  }, []);
+    },
+    [stationId],
+  );
 
   const loadHealth = useCallback(async () => {
     try {
@@ -99,14 +107,16 @@ export const useDashboard = () => {
       dispatch(fetchTelemetry()),
       dispatch(fetchDeviceStats()),
       dispatch(fetchAlertStats()),
+      dispatch(seedHistory()),
     ]);
     setLoading(false);
   }, [dispatch, loadAnalytics, loadCore, loadHealth, trendHours]);
 
+  // Reload everything whenever the console is pointed at another station.
   useEffect(() => {
     void refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [stationId]);
 
   useEffect(() => {
     void loadAnalytics(trendHours);

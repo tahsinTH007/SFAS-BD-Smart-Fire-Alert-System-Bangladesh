@@ -40,6 +40,7 @@ const DEFAULT_META: PriorityMeta = {
   barColor: "bg-gray-500",
   badge: "bg-gray-700 text-white",
   dotColor: "bg-gray-400",
+  glow: "shadow-slate-900/40",
 };
 
 export const NotificationCard: React.FC<NotificationCardProps> = ({

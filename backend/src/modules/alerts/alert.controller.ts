@@ -9,6 +9,7 @@ import {
   listAlertsQuerySchema,
   operatorSchema,
   resolveSchema,
+  scopeQuerySchema,
   timeseriesQuerySchema,
   topDevicesQuerySchema,
 } from "./alert.validator.js";
@@ -22,11 +23,14 @@ function requireId(id: string | undefined): string {
 export const getAllAlerts = asyncHandler(async (req, res) => {
   const query = validate(listAlertsQuerySchema, req.query);
 
-  // No filters and no explicit paging → return the flat list the map and
+  // Only a station scope (or nothing) → return the flat list the map and
   // notification views expect.
-  const isPlainRequest = Object.keys(req.query).length === 0;
+  const keys = Object.keys(req.query);
+  const isPlainRequest =
+    keys.length === 0 || (keys.length === 1 && keys[0] === "stationId");
+
   if (isPlainRequest) {
-    const alerts = await AlertService.getAllAlerts();
+    const alerts = await AlertService.getAllAlerts(query.stationId);
     res.json({ success: true, data: alerts });
     return;
   }
@@ -53,7 +57,8 @@ export const getSingleAlert = asyncHandler(async (req, res) => {
 export const getAlertsByType = asyncHandler(async (req, res) => {
   const { priority } = req.params;
   if (!priority) throw new BadRequestError("priority is required");
-  const alerts = await AlertService.getAlertsByType(priority);
+  const { stationId } = validate(scopeQuerySchema, req.query);
+  const alerts = await AlertService.getAlertsByType(priority, stationId);
   res.json({ success: true, data: alerts });
 });
 
@@ -65,20 +70,21 @@ export const getRelatedAlerts = asyncHandler(async (req, res) => {
 
 // ─── Analytics ────────────────────────────────────────────────────────────────
 
-export const getStats = asyncHandler(async (_req, res) => {
-  const stats = await AlertService.getStats();
+export const getStats = asyncHandler(async (req, res) => {
+  const { stationId } = validate(scopeQuerySchema, req.query);
+  const stats = await AlertService.getStats(stationId);
   res.json({ success: true, data: stats });
 });
 
 export const getTimeseries = asyncHandler(async (req, res) => {
-  const { hours } = validate(timeseriesQuerySchema, req.query);
-  const series = await AlertService.getTimeseries(hours);
+  const { hours, stationId } = validate(timeseriesQuerySchema, req.query);
+  const series = await AlertService.getTimeseries(hours, stationId);
   res.json({ success: true, data: series });
 });
 
 export const getTopDevices = asyncHandler(async (req, res) => {
-  const { limit } = validate(topDevicesQuerySchema, req.query);
-  const devices = await AlertService.getTopDevices(limit);
+  const { limit, stationId } = validate(topDevicesQuerySchema, req.query);
+  const devices = await AlertService.getTopDevices(limit, stationId);
   res.json({ success: true, data: devices });
 });
 

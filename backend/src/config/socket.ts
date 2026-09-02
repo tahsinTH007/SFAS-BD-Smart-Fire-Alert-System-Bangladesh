@@ -12,6 +12,11 @@ export const initSocket = (server: HttpServer): Server => {
     path: env.SOCKET_PATH,
     pingInterval: Number(env.SOCKET_PING_INTERVAL),
     pingTimeout: Number(env.SOCKET_PING_TIMEOUT),
+    // Alert payloads are ~1KB. Compressing them costs more latency than the
+    // bytes are worth, and this is a life-safety notification path.
+    perMessageDeflate: false,
+    // Skip the HTTP long-poll handshake entirely where the browser supports it.
+    transports: ["websocket", "polling"],
     cors: {
       origin(origin, callback) {
         if (!origin) return callback(null, true);

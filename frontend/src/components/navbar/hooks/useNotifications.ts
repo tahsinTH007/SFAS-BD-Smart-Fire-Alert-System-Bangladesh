@@ -1,12 +1,20 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
-import { useSelector, useDispatch } from "react-redux";
-import { AppDispatch, RootState } from "@/redux/store";
-import { fetchAlerts, updateAlert } from "@/redux/slices/alertSlice";
-import { AlertResponse } from "@/api/alertApi";
-import { Notification } from "@/components/notifications/types/notification";
 
-function mapAlertToNotification(alert: AlertResponse): Notification {
+import { useCallback, useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import type { AppDispatch, RootState } from "@/redux/store";
+import {
+  bulkMarkRead,
+  fetchAlerts,
+  markAlertRead,
+} from "@/redux/slices/alertSlice";
+import type { AlertResponse } from "@/api/types";
+import type {
+  Notification,
+  Priority,
+} from "@/components/notifications/types/notification";
+
+function toNotification(alert: AlertResponse): Notification {
   return {
     id: String(alert.id),
     type: alert.type,
@@ -14,53 +22,65 @@ function mapAlertToNotification(alert: AlertResponse): Notification {
     title: alert.title,
     message: alert.message,
     location: alert.location,
-    reportedBy: alert.reportedBy ?? "Unknown",
+    reportedBy: alert.reportedBy,
     contactNumber: alert.contactNumber,
     timestamp: alert.timestamp,
     read: alert.read,
     acknowledged: alert.acknowledged,
+    status: alert.status,
+    riskScore: alert.riskScore,
+    riskFactors: alert.riskFactors,
+    deviceId: alert.deviceId,
+    building: alert.building,
+    incident: alert.incident,
   };
 }
 
 export const useNotifications = () => {
   const dispatch = useDispatch<AppDispatch>();
-  const { alerts, loading, error } = useSelector(
-    (state: RootState) => state.alerts,
-  );
+  const { alerts, loading, error } = useSelector((s: RootState) => s.alerts);
 
-  const shownAlertsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    void dispatch(fetchAlerts());
+  }, [dispatch]);
 
-  const notifications: Notification[] = useMemo(
-    () => alerts.map(mapAlertToNotification),
+  const notifications = useMemo(
+    () => alerts.map(toNotification),
     [alerts],
   );
 
-  useEffect(() => {
-    dispatch(fetchAlerts());
-  }, [dispatch]);
-
-  // Counts
   const unreadCount = notifications.filter((n) => !n.read).length;
   const criticalCount = notifications.filter(
     (n) => !n.read && n.priority === "critical",
   ).length;
 
-  const markRead = (id: string) => {
-    const alert = alerts.find((a) => a.id === id);
-    if (alert) dispatch(updateAlert({ ...alert, read: true }));
-  };
+  const markRead = useCallback(
+    (id: string) => {
+      void dispatch(markAlertRead({ id, read: true }));
+    },
+    [dispatch],
+  );
 
-  const markAllRead = () => {
-    alerts.forEach((a) => {
-      if (!a.read) dispatch(updateAlert({ ...a, read: true }));
-    });
-  };
+  const markAllRead = useCallback(() => {
+    const ids = notifications.filter((n) => !n.read).map((n) => n.id);
+    if (ids.length) void dispatch(bulkMarkRead(ids));
+  }, [dispatch, notifications]);
 
+  /**
+   * The bell shows only what still needs attention, newest first — a dropdown
+   * listing hundreds of resolved alerts is not useful.
+   */
   const groupedNotifications = useMemo(() => {
+    const pending = notifications.filter(
+      (n) => !n.read && n.status !== "resolved",
+    );
+    const byPriority = (p: Priority) =>
+      pending.filter((n) => n.priority === p).slice(0, 8);
+
     return {
-      critical: notifications.filter((n) => n.priority === "critical"),
-      important: notifications.filter((n) => n.priority === "important"),
-      info: notifications.filter((n) => n.priority === "info"),
+      critical: byPriority("critical"),
+      important: byPriority("important"),
+      info: byPriority("info"),
     };
   }, [notifications]);
 

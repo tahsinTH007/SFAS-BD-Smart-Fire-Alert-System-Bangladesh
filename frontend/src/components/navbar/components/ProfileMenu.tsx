@@ -1,95 +1,106 @@
+"use client";
+
 import React from "react";
 import Link from "next/link";
-import { LogOut, User, Settings, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useSelector } from "react-redux";
+import { Clock, Radio, Settings, ShieldAlert, User } from "lucide-react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import type { RootState } from "@/redux/store";
+import { selectActiveStation } from "@/redux/slices/sessionSlice";
+
+const SHIFT_LABEL: Record<string, string> = {
+  day: "Day shift",
+  night: "Night shift",
+  rotating: "Rotating shift",
+};
 
 export const ProfileMenu: React.FC = () => {
+  const operator = useSelector((s: RootState) => s.session.operator);
+  const station = useSelector(selectActiveStation);
+
+  const initials =
+    operator.name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((w) => w[0])
+      .join("")
+      .toUpperCase() || "OP";
+
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          className="p-0 hover:bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+        <button
+          aria-label="Operator menu"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-sm font-bold text-white shadow-lg ring-2 ring-orange-500/40 ring-offset-2 ring-offset-slate-900 transition-all hover:ring-orange-400"
         >
-          <Avatar className="h-10 w-10 ring-2 ring-offset-2 ring-offset-slate-900 dark:ring-offset-slate-900 ring-orange-500/50 dark:ring-orange-600/40 cursor-pointer hover:ring-orange-500 dark:hover:ring-orange-500 transition-all shadow-lg">
-            <AvatarImage src={""} alt={"User"} />
-            <AvatarFallback className="bg-linear-to-br from-orange-500 to-red-600 text-white font-bold text-sm">
-              A
-            </AvatarFallback>
-          </Avatar>
-        </Button>
+          {initials}
+        </button>
       </PopoverTrigger>
+
       <PopoverContent
-        className="w-64 p-0 rounded-xl shadow-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 mt-2 z-10001"
         align="end"
+        className="z-[10001] mt-2 w-72 rounded-xl border border-slate-700 bg-slate-900 p-0 shadow-2xl"
       >
-        {/* Profile header */}
-        <div className="relative px-4 py-4 border-b-2 border-slate-100 dark:border-slate-800 bg-linear-to-r from-orange-50 to-red-50 dark:from-orange-950/20 dark:to-red-950/20 rounded-t-xl">
+        {/* Identity */}
+        <div className="border-b border-slate-800 px-4 py-4">
           <div className="flex items-center gap-3">
-            <Avatar className="h-12 w-12 ring-2 ring-white dark:ring-slate-800 shadow-lg">
-              <AvatarFallback className="bg-linear-to-br from-orange-500 to-red-600 text-white text-base font-bold">
-                A
-              </AvatarFallback>
-            </Avatar>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500 to-red-600 text-base font-bold text-white">
+              {initials}
+            </span>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">
-                Ashik Morsalin
+              <p className="truncate text-sm font-bold text-slate-100">
+                {operator.name}
               </p>
-              <p className="text-xs text-slate-600 dark:text-slate-400 truncate">
-                ashik.morsalin@sfas-bd.com
+              <p className="truncate text-xs text-slate-400">{operator.rank}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-[10px] text-slate-500">
+                <Clock size={9} />
+                {SHIFT_LABEL[operator.shift] ?? operator.shift}
               </p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <Shield
-                  size={12}
-                  className="text-green-600 dark:text-green-400"
-                />
-                <span className="text-[10px] font-semibold text-green-700 dark:text-green-400 uppercase tracking-wide">
-                  Administrator
-                </span>
-              </div>
             </div>
           </div>
+
+          {station && (
+            <div className="mt-3 flex items-center gap-1.5 rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-1.5">
+              <Radio size={11} className="shrink-0 text-orange-400" />
+              <span className="truncate text-[11px] text-slate-300">
+                {station.stationCode} — {station.name}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Actions */}
         <div className="p-2">
-          <Link href="/account">
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group">
-              <User
-                size={16}
-                className="text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300"
-              />
-              My Profile
-            </button>
+          <Link
+            href="/profile"
+            className="flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100"
+          >
+            <User size={15} className="text-slate-500" />
+            My profile
           </Link>
 
-          <Link href="/settings">
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group mt-0.5">
-              <Settings
-                size={16}
-                className="text-slate-500 dark:text-slate-400 group-hover:text-slate-700 dark:group-hover:text-slate-300"
-              />
-              Settings
-            </button>
+          <Link
+            href="/settings"
+            className="mt-0.5 flex w-full items-center gap-3 rounded-lg px-3.5 py-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-slate-100"
+          >
+            <Settings size={15} className="text-slate-500" />
+            Settings
           </Link>
+        </div>
 
-          <div className="my-2 border-t border-slate-200 dark:border-slate-800"></div>
-
-          <Link href="/">
-            <button className="w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors group">
-              <LogOut
-                size={16}
-                className="group-hover:translate-x-0.5 transition-transform"
-              />
-              Logout
-            </button>
-          </Link>
+        {/* There is no auth yet — say so rather than showing a fake logout. */}
+        <div className="border-t border-slate-800 px-4 py-3">
+          <p className="flex items-start gap-2 text-[10px] leading-relaxed text-slate-500">
+            <ShieldAlert size={12} className="mt-px shrink-0 text-amber-500/70" />
+            <span>
+              No sign-in configured. This name is a label stored in this browser.
+            </span>
+          </p>
         </div>
       </PopoverContent>
     </Popover>

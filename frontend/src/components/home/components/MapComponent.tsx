@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useId, useMemo } from "react";
 import { MapContainer, TileLayer, ZoomControl } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { MapAlert } from "../types/mapAlert";
 import { MarkersController } from "./MarkersController";
+import { MapResizeHandler } from "./MapResizeHandler";
 
 interface MapComponentProps {
   alerts: MapAlert[];
@@ -37,8 +38,14 @@ const MapComponent: React.FC<MapComponentProps> = ({
     return [lat, lng];
   }, [alerts]);
 
+  // React 19's dev-mode double-mount re-runs this component against the same
+  // DOM node, and Leaflet throws "Map container is being reused by another
+  // instance". A key unique to each mount hands it a fresh container.
+  const instanceKey = useId();
+
   return (
     <MapContainer
+      key={instanceKey}
       center={center}
       zoom={12}
       minZoom={5}
@@ -62,6 +69,8 @@ const MapComponent: React.FC<MapComponentProps> = ({
         url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
         maxZoom={19}
       />
+
+      <MapResizeHandler />
 
       <ZoomControl position="bottomright" />
 

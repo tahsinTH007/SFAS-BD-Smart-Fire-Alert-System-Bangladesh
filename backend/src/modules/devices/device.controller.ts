@@ -7,6 +7,7 @@ import * as DeviceService from "./device.service.js";
 import {
   deviceSchema,
   getAllDevicesQuerySchema,
+  deviceScopeSchema,
   heartbeatSchema,
   readingsQuerySchema,
 } from "./device.validator.js";
@@ -50,14 +51,25 @@ export const getAllDevices = asyncHandler(async (req, res) => {
   });
 });
 
-export const getDeviceStats = asyncHandler(async (_req, res) => {
-  const stats = await DeviceService.getDeviceStats();
+export const getDeviceStats = asyncHandler(async (req, res) => {
+  const { stationId } = validate(deviceScopeSchema, req.query);
+  const stats = await DeviceService.getDeviceStats(stationId);
   res.json({ success: true, data: stats });
 });
 
-export const getLiveTelemetry = asyncHandler(async (_req, res) => {
-  const telemetry = await DeviceService.getLiveTelemetry();
+export const getLiveTelemetry = asyncHandler(async (req, res) => {
+  const { stationId } = validate(deviceScopeSchema, req.query);
+  const telemetry = await DeviceService.getLiveTelemetry(stationId);
   res.json({ success: true, data: telemetry });
+});
+
+export const getRecentReadings = asyncHandler(async (req, res) => {
+  const { limit, stationId } = validate(readingsQuerySchema, req.query);
+  const data = await DeviceService.getRecentReadingsByDevice(
+    Math.min(limit, 60),
+    stationId,
+  );
+  res.json({ success: true, data });
 });
 
 export const getSingleDevice = asyncHandler(async (req, res) => {

@@ -1,4 +1,4 @@
-import { Schema, model } from "mongoose";
+import { Schema, model, Types } from "mongoose";
 
 export type AlertPriority = "critical" | "important" | "info";
 export type AlertStatus = "active" | "acknowledged" | "resolved";
@@ -35,6 +35,25 @@ const alertSchema = new Schema(
     estimatedPeople: String,
 
     deviceId: { type: String, index: true },
+
+    /**
+     * Owning station. The console is deployed per fire station, so nearly every
+     * read is scoped by this — an Uttara operator must never see Gazipur's
+     * alerts.
+     */
+    stationId: {
+      type: Types.ObjectId,
+      ref: "Station",
+      default: null,
+      index: true,
+    },
+
+    buildingId: {
+      type: Types.ObjectId,
+      ref: "Building",
+      default: null,
+      index: true,
+    },
     sector: { type: String, index: true },
     building: { type: String, index: true },
     floor: { type: String },
@@ -87,6 +106,9 @@ const alertSchema = new Schema(
 );
 
 alertSchema.index({ status: 1, priority: 1 });
+// Station-scoped feeds are the hot path.
+alertSchema.index({ stationId: 1, createdAt: -1 });
+alertSchema.index({ stationId: 1, status: 1, priority: 1 });
 alertSchema.index({ sector: 1, building: 1, floor: 1 });
 alertSchema.index({ createdAt: -1 });
 alertSchema.index({ deviceId: 1, createdAt: -1 });

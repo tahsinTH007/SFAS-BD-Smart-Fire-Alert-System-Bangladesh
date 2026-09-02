@@ -26,8 +26,28 @@ const corsOptions: CorsOptions = {
     if (isOriginAllowed(origin)) return callback(null, true);
     return callback(new Error(`Origin ${origin} is not allowed by CORS`));
   },
-  methods: env.CORS_METHODS.split(",").map((m) => m.trim()),
-  allowedHeaders: env.CORS_HEADERS.split(",").map((h) => h.trim()),
+  // The API exposes PATCH (acknowledge/resolve/read) and DELETE routes, and the
+  // browser always preflights with OPTIONS. A CORS_METHODS value that omits any
+  // of them silently breaks those routes in the browser while curl keeps
+  // working, so the required set is unioned in rather than trusted from config.
+  methods: Array.from(
+    new Set([
+      ...env.CORS_METHODS.split(",").map((m) => m.trim().toUpperCase()),
+      "GET",
+      "POST",
+      "PATCH",
+      "DELETE",
+      "OPTIONS",
+    ]),
+  ).filter(Boolean),
+  allowedHeaders: Array.from(
+    new Set([
+      ...env.CORS_HEADERS.split(",").map((h) => h.trim()),
+      "Content-Type",
+      "Authorization",
+      "Accept",
+    ]),
+  ).filter(Boolean),
   exposedHeaders: ["Retry-After"],
   credentials: true,
   optionsSuccessStatus: 204,

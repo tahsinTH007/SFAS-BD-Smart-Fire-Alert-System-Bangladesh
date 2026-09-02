@@ -1,4 +1,6 @@
 import React from "react";
+import { useSelector } from "react-redux";
+import { selectActiveStation } from "@/redux/slices/sessionSlice";
 import Link from "next/link";
 import { ArrowLeft, Bell, CheckCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,8 +18,9 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
   totalCount,
   onMarkAllRead,
 }) => {
+  const station = useSelector(selectActiveStation);
   return (
-    <div className="flex items-start justify-between">
+    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       {/* Left: Back + Title */}
       <div>
         <Link
@@ -25,7 +28,7 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
           className="inline-flex items-center gap-1.5 text-slate-500 hover:text-slate-300 text-[13px] mb-3 transition-colors"
         >
           <ArrowLeft size={14} />
-          Back to Dashboard
+          Back to live map
         </Link>
         <div className="flex items-center gap-3">
           <div className="relative">
@@ -40,10 +43,11 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
           </div>
           <div>
             <h1 className="text-xl font-bold text-slate-100 tracking-tight">
-              All Notifications
+              Alert console
             </h1>
             <p className="text-[12px] text-slate-500 mt-0.5">
-              {unreadCount} unread · {totalCount} total alerts
+              {station ? `${station.stationCode} · ` : ""}
+              {unreadCount} unread · {totalCount} total
             </p>
           </div>
         </div>
@@ -55,7 +59,7 @@ export const NotificationHeader: React.FC<NotificationHeaderProps> = ({
         size="sm"
         onClick={onMarkAllRead}
         disabled={unreadCount === 0}
-        className="border-slate-700 text-slate-400 hover:text-slate-100 hover:border-slate-600 bg-slate-900 text-[12px] gap-1.5 disabled:opacity-30"
+        className="w-full sm:w-auto shrink-0 border-slate-700 text-slate-400 hover:text-slate-100 hover:border-slate-600 bg-slate-900 text-[12px] gap-1.5 disabled:opacity-30"
       >
         <CheckCheck size={13} />
         Mark All Read

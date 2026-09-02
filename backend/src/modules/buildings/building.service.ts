@@ -69,6 +69,6 @@ export async function deleteBuilding(id: string) {
   return deleted;
 }
 
-export async function getBuildingStats() {
-  return repoBuildingStats();
+export async function getBuildingStats(stationId?: string) {
+  return repoBuildingStats(stationId);
 }

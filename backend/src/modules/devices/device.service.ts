@@ -10,6 +10,7 @@ import {
   repoGetAllDevices,
   repoGetDeviceReadings,
   repoLatestReadings,
+  repoRecentReadingsByDevice,
   repoUpdateDevice,
 } from "./device.repository.js";
 import type {
@@ -74,6 +75,7 @@ export async function getAllDevices(params: GetAllDevicesQuery) {
   if (search) query.deviceCode = { $regex: search, $options: "i" };
   if (status) query.status = status;
   if (buildingId) query.buildingId = buildingId;
+  if (params.stationId) query.stationId = params.stationId;
   if (floor !== undefined) query.floor = Number(floor);
 
   const { devices, total } = await repoGetAllDevices({
@@ -123,16 +125,16 @@ export async function deleteDevice(id: string) {
   return deleted;
 }
 
-export async function getDeviceStats() {
-  return repoDeviceStats();
+export async function getDeviceStats(stationId?: string) {
+  return repoDeviceStats(stationId);
 }
 
 export async function getDeviceReadings(deviceCode: string, limit: number) {
   return repoGetDeviceReadings(deviceCode, limit);
 }
 
-export async function getLiveTelemetry() {
-  const devices = await repoLatestReadings();
+export async function getLiveTelemetry(stationId?: string) {
+  const devices = await repoLatestReadings(stationId);
   const staleAfter = 5 * 60_000;
   const now = Date.now();
 
@@ -174,4 +176,17 @@ export async function heartbeat(deviceCode: string, ipAddress?: string) {
 
   await cacheInvalidate("devices:*");
   return { deviceCode, acknowledgedAt: new Date().toISOString() };
+}
+
+/** Short per-device history so the dashboard can draw sparklines immediately. */
+export async function getRecentReadingsByDevice(
+  perDevice: number,
+  stationId?: string,
+) {
+  // Only pull history for units this station actually owns.
+  const codes = stationId
+    ? (await repoLatestReadings(stationId)).map((d: any) => d.deviceCode)
+    : undefined;
+  const rows = await repoRecentReadingsByDevice(perDevice, codes);
+  return Object.fromEntries(rows.map((r) => [r.deviceCode, r.readings]));
 }

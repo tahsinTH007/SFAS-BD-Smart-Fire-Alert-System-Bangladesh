@@ -1,150 +1,159 @@
 "use client";
 
-import React, { useState } from "react";
-import { Flame } from "lucide-react";
+import React from "react";
+import Link from "next/link";
+import { AlertCircle, Flame, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { useSelector } from "react-redux";
+import { selectActiveStation } from "@/redux/slices/sessionSlice";
 import { useDashboard } from "./hooks/useDashboard";
-import { StatsOverview } from "./components/StatsOverview";
 import { TabNav } from "./components/TabNav";
+import { OverviewTab } from "./components/OverviewTab";
+import { TelemetryTab } from "./components/TelemetryTab";
 import { DevicesTable } from "./components/DevicesTable";
 import { BuildingsTable } from "./components/BuildingsTable";
-import { UnitsTable } from "./components/UnitsTable";
-import { Device, Building, Unit } from "./types";
+import { StationsTable } from "./components/StationsTable";
 
 const Dashboard = () => {
-  const {
-    activeTab,
-    setActiveTab,
-    devices,
-    buildings,
-    units,
-    addDevice,
-    updateDevice,
-    deleteDevice,
-    addBuilding,
-    updateBuilding,
-    deleteBuilding,
-    addUnit,
-    updateUnit,
-    deleteUnit,
-    stats,
-  } = useDashboard();
-
-  // Placeholder handlers for add/edit (in real app, these would open modals)
-  const handleAddDevice = () => {
-    alert("Add Device Modal - To be implemented");
-    // Example:
-    // const newDevice: Device = { ... };
-    // addDevice(newDevice);
-  };
-
-  const handleEditDevice = (device: Device) => {
-    alert(`Edit Device: ${device.deviceCode} - To be implemented`);
-    // Example:
-    // updateDevice(device._id!, { status: "maintenance" });
-  };
-
-  const handleDeleteDevice = (id: string) => {
-    if (confirm("Are you sure you want to delete this device?")) {
-      deleteDevice(id);
-    }
-  };
-
-  const handleAddBuilding = () => {
-    alert("Add Building Modal - To be implemented");
-  };
-
-  const handleEditBuilding = (building: Building) => {
-    alert(`Edit Building: ${building.name} - To be implemented`);
-  };
-
-  const handleDeleteBuilding = (id: string) => {
-    if (confirm("Are you sure you want to delete this building?")) {
-      deleteBuilding(id);
-    }
-  };
-
-  const handleAddUnit = () => {
-    alert("Add Unit Modal - To be implemented");
-  };
-
-  const handleEditUnit = (unit: Unit) => {
-    alert(`Edit Unit: ${unit.unitCode} - To be implemented`);
-  };
-
-  const handleDeleteUnit = (id: string) => {
-    if (confirm("Are you sure you want to delete this unit?")) {
-      deleteUnit(id);
-    }
-  };
+  const d = useDashboard();
+  const station = useSelector(selectActiveStation);
 
   return (
-    <div
-      className="min-h-screen bg-slate-50 dark:bg-slate-950"
-      style={{ fontFamily: "'Inter', sans-serif" }}
-    >
-      {/* Header */}
-      <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 dark:from-slate-950 dark:via-slate-900 dark:to-slate-950 border-b-2 border-orange-500/30 shadow-lg">
-        <div className="max-w-7xl mx-auto px-6 py-6">
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm">
+        <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-5 sm:px-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 shadow-lg">
-              <Flame size={24} className="text-white" />
-            </div>
+            <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-orange-500/30 bg-gradient-to-br from-orange-500/20 to-red-600/20">
+              <Flame size={20} className="text-orange-400" />
+            </span>
             <div>
-              <h1 className="text-2xl font-bold text-white">
+              <h1 className="text-lg font-bold tracking-tight text-slate-50">
                 System Dashboard
               </h1>
-              <p className="text-sm text-slate-400">
-                Manage devices, buildings, and fire units
+              <p className="text-xs text-slate-500">
+                {station
+                  ? `${station.stationCode} — ${station.name}`
+                  : "OGNIBORMO units, buildings and station coverage"}
               </p>
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold ${
+                d.socketConnected
+                  ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-400"
+                  : "border-slate-700 bg-slate-900 text-slate-500"
+              }`}
+            >
+              {d.socketConnected ? <Wifi size={12} /> : <WifiOff size={12} />}
+              {d.socketConnected ? "Live" : "Offline"}
+            </span>
+
+            <button
+              onClick={() => void d.refresh()}
+              disabled={d.loading}
+              className="flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:bg-slate-800 disabled:opacity-50"
+            >
+              <RefreshCw
+                size={12}
+                className={d.loading ? "animate-spin" : ""}
+              />
+              Refresh
+            </button>
+
+            <Link
+              href="/"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors hover:bg-slate-800"
+            >
+              Live map
+            </Link>
+          </div>
         </div>
-      </div>
+      </header>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        {/* Stats Overview */}
-        <StatsOverview stats={stats} />
+      {/* ── Body ───────────────────────────────────────────────────────── */}
+      <main className="mx-auto flex max-w-7xl flex-col gap-5 px-4 py-6 sm:px-6">
+        {d.error && (
+          <div className="flex items-start gap-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3">
+            <AlertCircle size={16} className="mt-0.5 shrink-0 text-red-400" />
+            <div>
+              <p className="text-sm font-semibold text-red-300">
+                Cannot reach the API
+              </p>
+              <p className="mt-0.5 text-xs text-red-400/80">{d.error}</p>
+            </div>
+          </div>
+        )}
 
-        {/* Tab Navigation */}
         <TabNav
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
+          activeTab={d.activeTab}
+          onTabChange={d.setActiveTab}
           counts={{
-            devices: devices.length,
-            buildings: buildings.length,
-            units: units.length,
+            devices: d.devices.length,
+            buildings: d.buildings.length,
+            stations: d.stations.length,
+            telemetry: d.telemetry.length,
           }}
         />
 
-        {/* Content based on active tab */}
-        {activeTab === "devices" && (
+        {d.activeTab === "overview" && (
+          <OverviewTab
+            alertStats={d.alertStats}
+            deviceStats={d.deviceStats}
+            buildingStats={d.buildingStats}
+            timeseries={d.timeseries}
+            topDevices={d.topDevices}
+            health={d.health}
+            trendHours={d.trendHours}
+            onTrendHoursChange={d.setTrendHours}
+            socketConnected={d.socketConnected}
+            loading={d.loading}
+          />
+        )}
+
+        {d.activeTab === "telemetry" && (
+          <TelemetryTab
+            telemetry={d.telemetry}
+            history={d.history}
+            socketConnected={d.socketConnected}
+            loading={d.loading}
+          />
+        )}
+
+        {d.activeTab === "devices" && (
           <DevicesTable
-            devices={devices}
-            onAdd={handleAddDevice}
-            onEdit={handleEditDevice}
-            onDelete={handleDeleteDevice}
+            devices={d.devices}
+            buildings={d.buildings}
+            stations={d.stations}
+            loading={d.loading}
+            onCreate={d.createDevice}
+            onUpdate={d.updateDevice}
+            onDelete={d.deleteDevice}
           />
         )}
 
-        {activeTab === "buildings" && (
+        {d.activeTab === "buildings" && (
           <BuildingsTable
-            buildings={buildings}
-            onAdd={handleAddBuilding}
-            onEdit={handleEditBuilding}
-            onDelete={handleDeleteBuilding}
+            buildings={d.buildings}
+            stations={d.stations}
+            loading={d.loading}
+            onCreate={d.createBuilding}
+            onUpdate={d.updateBuilding}
+            onDelete={d.deleteBuilding}
           />
         )}
 
-        {activeTab === "units" && (
-          <UnitsTable
-            units={units}
-            onAdd={handleAddUnit}
-            onEdit={handleEditUnit}
-            onDelete={handleDeleteUnit}
+        {d.activeTab === "stations" && (
+          <StationsTable
+            stations={d.stations}
+            loading={d.loading}
+            onCreate={d.createStation}
+            onUpdate={d.updateStation}
+            onDelete={d.deleteStation}
           />
         )}
-      </div>
+      </main>
     </div>
   );
 };

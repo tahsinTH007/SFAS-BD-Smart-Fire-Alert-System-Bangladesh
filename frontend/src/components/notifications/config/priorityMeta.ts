@@ -10,6 +10,7 @@ export interface PriorityMeta {
   badge: string;
   barColor: string;
   dotColor: string;
+  glow: string;
 }
 
 export const PRIORITY_META: Record<Priority, PriorityMeta> = {
@@ -22,6 +23,7 @@ export const PRIORITY_META: Record<Priority, PriorityMeta> = {
     badge: "bg-red-600 text-white hover:bg-red-600",
     barColor: "bg-red-500",
     dotColor: "bg-red-500",
+    glow: "shadow-red-900/40",
   },
   important: {
     label: "Important",
@@ -32,6 +34,7 @@ export const PRIORITY_META: Record<Priority, PriorityMeta> = {
     badge: "bg-amber-600 text-white hover:bg-amber-600",
     barColor: "bg-amber-500",
     dotColor: "bg-amber-500",
+    glow: "shadow-amber-900/40",
   },
   info: {
     label: "Info",
@@ -42,5 +45,6 @@ export const PRIORITY_META: Record<Priority, PriorityMeta> = {
     badge: "bg-sky-700 text-white hover:bg-sky-700",
     barColor: "bg-sky-500",
     dotColor: "bg-sky-500",
+    glow: "shadow-sky-900/40",
   },
 } as const;

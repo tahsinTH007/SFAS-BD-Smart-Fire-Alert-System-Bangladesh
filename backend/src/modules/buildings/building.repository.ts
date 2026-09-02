@@ -104,8 +104,15 @@ export async function repoCountDevicesIn(buildingId: string) {
   return Device.countDocuments({ buildingId: new Types.ObjectId(buildingId) });
 }
 
-export async function repoBuildingStats() {
+export async function repoBuildingStats(stationId?: string) {
+  const match =
+    stationId && isValidId(stationId)
+      ? { stationId: new Types.ObjectId(stationId) }
+      : {};
+  const pre = Object.keys(match).length ? [{ $match: match }] : [];
+
   const rows = await Building.aggregate([
+    ...pre,
     {
       $group: {
         _id: null,
@@ -117,6 +124,7 @@ export async function repoBuildingStats() {
   ]);
 
   const byOccupancy = await Building.aggregate([
+    ...pre,
     { $group: { _id: "$occupancyType", count: { $sum: 1 } } },
   ]);
 

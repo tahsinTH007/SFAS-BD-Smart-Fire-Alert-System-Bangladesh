@@ -40,8 +40,10 @@ export const getAllBuildings = asyncHandler(async (req, res) => {
   });
 });
 
-export const getBuildingStats = asyncHandler(async (_req, res) => {
-  const stats = await BuildingService.getBuildingStats();
+export const getBuildingStats = asyncHandler(async (req, res) => {
+  const stationId =
+    typeof req.query.stationId === "string" ? req.query.stationId : undefined;
+  const stats = await BuildingService.getBuildingStats(stationId);
   res.json({ success: true, data: stats });
 });
 

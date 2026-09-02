@@ -81,6 +81,8 @@ export function hydrateAlert(doc: any): AlertDomain {
     riskFactors: doc.riskFactors ?? [],
     status: doc.status ?? "active",
     deviceId: doc.deviceId ?? null,
+    stationId: doc.stationId ? String(doc.stationId) : null,
+    buildingId: doc.buildingId ? String(doc.buildingId) : null,
     sector: doc.sector ?? null,
     building: doc.building ?? null,
     floor: doc.floor ?? null,
@@ -193,6 +195,11 @@ export async function repoBulkDelete(ids: string[]): Promise<number> {
 function buildFilter(q: AlertQuery): Record<string, unknown> {
   const filter: Record<string, unknown> = {};
 
+  // Station scope comes first: the console is deployed per station and must
+  // never leak another station's incidents.
+  if (q.stationId && isValidId(q.stationId)) {
+    filter.stationId = new Types.ObjectId(q.stationId);
+  }
   if (q.priority && q.priority !== "all") filter.priority = q.priority;
   if (q.status && q.status !== "all") filter.status = q.status;
   if (q.type) filter.type = q.type;
@@ -244,8 +251,16 @@ export async function repoGetAlerts(q: AlertQuery): Promise<{
   return { alerts: docs.map(hydrateAlert), total };
 }
 
-export async function repoGetAllAlerts(): Promise<AlertDomain[]> {
-  const results = await AlertModel.find()
+function scope(stationId?: string): Record<string, unknown> {
+  return stationId && isValidId(stationId)
+    ? { stationId: new Types.ObjectId(stationId) }
+    : {};
+}
+
+export async function repoGetAllAlerts(
+  stationId?: string,
+): Promise<AlertDomain[]> {
+  const results = await AlertModel.find(scope(stationId))
     .sort({ createdAt: -1 })
     .limit(500)
     .lean();
@@ -262,8 +277,9 @@ export async function repoGetAlertById(
 
 export async function repoGetAlertsByType(
   priority: string,
+  stationId?: string,
 ): Promise<AlertDomain[]> {
-  const results = await AlertModel.find({ priority })
+  const results = await AlertModel.find({ priority, ...scope(stationId) })
     .sort({ createdAt: -1 })
     .lean();
   return results.map(hydrateAlert);
@@ -280,6 +296,7 @@ export async function repoGetRelated(
 
   const docs = await AlertModel.find({
     _id: { $ne: base._id },
+    ...(base.stationId ? { stationId: base.stationId } : {}),
     $or: [
       { building: base.building },
       { sector: base.sector },
@@ -295,13 +312,18 @@ export async function repoGetRelated(
 
 // ─── Aggregations ─────────────────────────────────────────────────────────────
 
-export async function repoGetStats() {
+export async function repoGetStats(stationId?: string) {
+  const match = scope(stationId);
+  const pre = Object.keys(match).length ? [{ $match: match }] : [];
+
   const [byPriority, byStatus, totals, last24h] = await Promise.all([
     AlertModel.aggregate([
+      ...pre,
       { $group: { _id: "$priority", count: { $sum: 1 } } },
     ]),
-    AlertModel.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    AlertModel.aggregate([...pre, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     AlertModel.aggregate([
+      ...pre,
       {
         $group: {
           _id: null,
@@ -316,6 +338,7 @@ export async function repoGetStats() {
       },
     ]),
     AlertModel.countDocuments({
+      ...match,
       timestamp: { $gte: new Date(Date.now() - 24 * 3600_000) },
     }),
   ]);
@@ -346,12 +369,12 @@ export async function repoGetStats() {
 }
 
 /** Hourly or daily alert counts for the dashboard trend chart. */
-export async function repoGetTimeseries(hours: number) {
+export async function repoGetTimeseries(hours: number, stationId?: string) {
   const since = new Date(Date.now() - hours * 3600_000);
   const bucketByDay = hours > 72;
 
   const rows = await AlertModel.aggregate([
-    { $match: { timestamp: { $gte: since } } },
+    { $match: { ...scope(stationId), timestamp: { $gte: since } } },
     {
       $group: {
         _id: {
@@ -388,9 +411,9 @@ export async function repoGetTimeseries(hours: number) {
 }
 
 /** Devices ranked by how many alerts they have produced. */
-export async function repoGetTopDevices(limit = 5) {
+export async function repoGetTopDevices(limit = 5, stationId?: string) {
   return AlertModel.aggregate([
-    { $match: { deviceId: { $ne: null } } },
+    { $match: { ...scope(stationId), deviceId: { $ne: null } } },
     {
       $group: {
         _id: "$deviceId",

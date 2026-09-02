@@ -80,12 +80,18 @@ export async function repoGetAllDevices({
   return { devices: withHealth, total };
 }
 
-export async function repoDeviceStats() {
+export async function repoDeviceStats(stationId?: string) {
   const staleCutoff = new Date(Date.now() - 5 * 60_000);
+  const match =
+    stationId && isValidId(stationId)
+      ? { stationId: new Types.ObjectId(stationId) }
+      : {};
+  const pre = Object.keys(match).length ? [{ $match: match }] : [];
 
   const [byStatus, totals, online] = await Promise.all([
-    Device.aggregate([{ $group: { _id: "$status", count: { $sum: 1 } } }]),
+    Device.aggregate([...pre, { $group: { _id: "$status", count: { $sum: 1 } } }]),
     Device.aggregate([
+      ...pre,
       {
         $group: {
           _id: null,
@@ -95,7 +101,7 @@ export async function repoDeviceStats() {
         },
       },
     ]),
-    Device.countDocuments({ lastSeenAt: { $gte: staleCutoff } }),
+    Device.countDocuments({ ...match, lastSeenAt: { $gte: staleCutoff } }),
   ]);
 
   const pick = (key: string) =>
@@ -138,10 +144,60 @@ export async function repoGetDeviceReadings(deviceCode: string, limit: number) {
 }
 
 /** Latest reading per device — powers the live telemetry grid. */
-export async function repoLatestReadings() {
-  return Device.find({}, { apiKeyHash: 0, __v: 0 })
+export async function repoLatestReadings(stationId?: string) {
+  const match =
+    stationId && isValidId(stationId)
+      ? { stationId: new Types.ObjectId(stationId) }
+      : {};
+  return Device.find(match, { apiKeyHash: 0, __v: 0 })
     .populate("buildingId", "name sector")
     .sort({ "lastSensorData.riskScore": -1 })
     .limit(100)
     .lean();
+}
+
+/**
+ * Recent readings for every device in one aggregation.
+ *
+ * The dashboard needs a short history per unit to draw sparklines on first
+ * paint. Fetching that per-device would be one request per card; this returns
+ * them all at once, oldest → newest within each device.
+ */
+export async function repoRecentReadingsByDevice(
+  perDevice: number,
+  deviceCodes?: string[],
+) {
+  const rows = await Reading.aggregate([
+    ...(deviceCodes?.length
+      ? [{ $match: { deviceCode: { $in: deviceCodes } } }]
+      : []),
+    { $sort: { recordedAt: -1 } },
+    {
+      $group: {
+        _id: "$deviceCode",
+        readings: {
+          $push: {
+            temperature: "$temperature",
+            humidity: "$humidity",
+            smoke: "$smoke",
+            gas: "$gas",
+            flame: "$flame",
+            riskScore: "$riskScore",
+            recordedAt: "$recordedAt",
+          },
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        deviceCode: "$_id",
+        readings: {
+          $reverseArray: { $slice: ["$readings", perDevice] },
+        },
+      },
+    },
+  ]);
+
+  return rows as { deviceCode: string; readings: unknown[] }[];
 }

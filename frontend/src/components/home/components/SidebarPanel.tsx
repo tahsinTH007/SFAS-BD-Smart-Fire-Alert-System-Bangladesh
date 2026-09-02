@@ -15,6 +15,8 @@ interface SidebarPanelProps {
   hoveredId: string | null;
   onHover: (id: string | null) => void;
   onSidebarClick: (id: string) => void;
+  /** Drops the brand header when shown inside the mobile drawer. */
+  compact?: boolean;
 }
 
 export const SidebarPanel: React.FC<SidebarPanelProps> = ({
@@ -25,6 +27,7 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
   hoveredId,
   onHover,
   onSidebarClick,
+  compact = false,
 }) => {
   const alertCounts: Record<Priority, number> = {
     critical: alerts.filter((a) => a.priority === "critical").length,
@@ -33,8 +36,9 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
   };
 
   return (
-    <div className="w-80 shrink-0 bg-slate-900 border-r border-slate-800 flex flex-col overflow-hidden">
+    <div className="flex h-full w-full flex-col overflow-hidden border-slate-800 bg-slate-900 lg:border-r">
       {/* Brand */}
+      {!compact && (
       <div className="px-5 pt-5 pb-4">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-red-950 border border-red-800/60 flex items-center justify-center">
@@ -50,8 +54,9 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
           </div>
         </div>
       </div>
+      )}
 
-      <Separator className="border-slate-800" />
+      {!compact && <Separator className="border-slate-800" />}
 
       <StatsPanel
         criticalCount={criticalCount}
@@ -62,7 +67,7 @@ export const SidebarPanel: React.FC<SidebarPanelProps> = ({
       <MapLegend alertCounts={alertCounts} />
 
       {/* Alert list */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="sfas-scroll min-h-0 flex-1 overflow-y-auto">
         <div className="px-4 pt-3 pb-1.5">
           <p className="text-[9px] text-slate-600 font-semibold uppercase tracking-widest">
             Live Alerts — click to locate

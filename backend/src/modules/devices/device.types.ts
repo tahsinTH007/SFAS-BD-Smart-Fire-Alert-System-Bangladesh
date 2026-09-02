@@ -70,6 +70,7 @@ export type DeviceDocument = HydratedDocument<DeviceSchemaType>;
 export type GetAllDevicesQuery = {
   page: number;
   limit: number;
+  stationId?: string;
   search?: string;
   status?: DeviceStatus;
   buildingId?: string;

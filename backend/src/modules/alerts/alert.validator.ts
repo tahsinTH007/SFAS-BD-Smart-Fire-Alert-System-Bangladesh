@@ -15,6 +15,7 @@ export const listAlertsQuerySchema = z.object({
     .optional()
     .transform((v) => Math.min(200, Math.max(1, parseInt(v || "50", 10) || 50))),
 
+  stationId: z.string().max(64).optional(),
   priority: z.enum(["critical", "important", "info", "all"]).optional(),
   status: z.enum(["active", "acknowledged", "resolved", "all"]).optional(),
   type: z.string().max(50).optional(),
@@ -60,6 +61,7 @@ export const bulkIdsSchema = z.object({
 });
 
 export const timeseriesQuerySchema = z.object({
+  stationId: z.string().max(64).optional(),
   hours: z
     .string()
     .optional()
@@ -67,8 +69,13 @@ export const timeseriesQuerySchema = z.object({
 });
 
 export const topDevicesQuerySchema = z.object({
+  stationId: z.string().max(64).optional(),
   limit: z
     .string()
     .optional()
     .transform((v) => Math.min(50, Math.max(1, parseInt(v || "5", 10) || 5))),
+});
+
+export const scopeQuerySchema = z.object({
+  stationId: z.string().max(64).optional(),
 });
