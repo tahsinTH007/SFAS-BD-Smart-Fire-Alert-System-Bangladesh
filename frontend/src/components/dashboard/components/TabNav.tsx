@@ -4,9 +4,11 @@ import React from "react";
 import {
   Activity,
   Building2,
+  ChartColumn,
   Cpu,
   LayoutGrid,
   Radio,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -20,6 +22,7 @@ interface TabNavProps {
     buildings: number;
     stations: number;
     telemetry: number;
+    units: number;
   };
 }
 
@@ -30,6 +33,8 @@ const TABS: {
   countKey?: keyof TabNavProps["counts"];
 }[] = [
   { key: "overview", label: "Overview", icon: LayoutGrid },
+  { key: "units", label: "Units & Crew", icon: Truck, countKey: "units" },
+  { key: "summary", label: "Summary", icon: ChartColumn },
   { key: "telemetry", label: "Live Sensors", icon: Activity, countKey: "telemetry" },
   { key: "devices", label: "Devices", icon: Cpu, countKey: "devices" },
   { key: "buildings", label: "Buildings", icon: Building2, countKey: "buildings" },

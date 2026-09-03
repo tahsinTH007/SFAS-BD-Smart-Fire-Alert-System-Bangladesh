@@ -11,6 +11,7 @@ import {
 } from "@/redux/slices/telemetrySlice";
 import { fetchAlertStats } from "@/redux/slices/alertSlice";
 import { alertApi } from "@/api/alertApi";
+import { analyticsApi, unitApi } from "@/api/unitApi";
 import {
   buildingApi,
   deviceApi,
@@ -26,6 +27,11 @@ import type {
   Station,
   TimeseriesPoint,
   TopDevice,
+  Unit,
+  UnitStats,
+  UnitStatus,
+  DispatchRecord,
+  AnalyticsSummary,
 } from "@/api/types";
 import type { DashboardTab } from "../types";
 
@@ -46,6 +52,12 @@ export const useDashboard = () => {
   const [timeseries, setTimeseries] = useState<TimeseriesPoint[]>([]);
   const [topDevices, setTopDevices] = useState<TopDevice[]>([]);
   const [health, setHealth] = useState<HealthReport | null>(null);
+
+  const [units, setUnits] = useState<Unit[]>([]);
+  const [unitStats, setUnitStats] = useState<UnitStats | null>(null);
+  const [activeDispatches, setActiveDispatches] = useState<DispatchRecord[]>([]);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [summaryDays, setSummaryDays] = useState(30);
 
   const [trendHours, setTrendHours] = useState(24);
   const [loading, setLoading] = useState(true);
@@ -90,6 +102,33 @@ export const useDashboard = () => {
     [stationId],
   );
 
+  const loadUnits = useCallback(async () => {
+    try {
+      const scope = stationId ?? undefined;
+      const [u, us, ad] = await Promise.all([
+        unitApi.list({ stationId: scope }),
+        unitApi.stats(scope),
+        unitApi.activeDispatches(scope),
+      ]);
+      setUnits(u);
+      setUnitStats(us);
+      setActiveDispatches(ad);
+    } catch {
+      // The unit board is one tab; a failure here must not blank the dashboard.
+    }
+  }, [stationId]);
+
+  const loadSummary = useCallback(
+    async (days: number) => {
+      try {
+        setSummary(await analyticsApi.summary(stationId ?? undefined, days));
+      } catch {
+        setSummary(null);
+      }
+    },
+    [stationId],
+  );
+
   const loadHealth = useCallback(async () => {
     try {
       setHealth(await systemApi.health());
@@ -108,9 +147,11 @@ export const useDashboard = () => {
       dispatch(fetchDeviceStats()),
       dispatch(fetchAlertStats()),
       dispatch(seedHistory()),
+      loadUnits(),
+      loadSummary(summaryDays),
     ]);
     setLoading(false);
-  }, [dispatch, loadAnalytics, loadCore, loadHealth, trendHours]);
+  }, [dispatch, loadAnalytics, loadCore, loadHealth, loadUnits, loadSummary, summaryDays, trendHours]);
 
   // Reload everything whenever the console is pointed at another station.
   useEffect(() => {
@@ -121,6 +162,10 @@ export const useDashboard = () => {
   useEffect(() => {
     void loadAnalytics(trendHours);
   }, [trendHours, loadAnalytics]);
+
+  useEffect(() => {
+    void loadSummary(summaryDays);
+  }, [summaryDays, loadSummary]);
 
   // Poll the pieces the socket does not push (stats, health).
   useEffect(() => {
@@ -207,6 +252,42 @@ export const useDashboard = () => {
     [wrap],
   );
 
+  const setUnitStatus = useCallback(
+    async (id: string, status: UnitStatus, note?: string) => {
+      const res = await wrap(
+        () => unitApi.setStatus(id, status, note),
+        "Unit status updated",
+      );
+      await loadUnits();
+      return res;
+    },
+    [wrap, loadUnits],
+  );
+
+  const setCrewDuty = useCallback(
+    async (unitId: string, crewId: string, onDuty: boolean) => {
+      try {
+        await unitApi.updateCrew(unitId, crewId, { onDuty });
+        await loadUnits();
+      } catch (err) {
+        toast.error(toApiError(err).message);
+      }
+    },
+    [loadUnits],
+  );
+
+  const setDispatchStatus = useCallback(
+    async (dispatchId: string, status: DispatchRecord["status"]) => {
+      const res = await wrap(
+        () => unitApi.setDispatchStatus(dispatchId, status),
+        "Dispatch updated",
+      );
+      await loadUnits();
+      return res;
+    },
+    [wrap, loadUnits],
+  );
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const buildingNameById = useMemo(() => {
@@ -237,6 +318,12 @@ export const useDashboard = () => {
     devices,
     buildings,
     stations,
+    units,
+    unitStats,
+    activeDispatches,
+    summary,
+    summaryDays,
+    setSummaryDays,
     telemetry: rankedTelemetry,
     history,
 
@@ -265,6 +352,11 @@ export const useDashboard = () => {
     createStation,
     updateStation,
     deleteStation,
+
+    setUnitStatus,
+    setCrewDuty,
+    setDispatchStatus,
+    reloadUnits: loadUnits,
 
     buildingNameById,
     stationNameById,

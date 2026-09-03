@@ -1,5 +1,7 @@
 export type DashboardTab =
   | "overview"
+  | "units"
+  | "summary"
   | "telemetry"
   | "devices"
   | "buildings"
@@ -14,4 +16,8 @@ export type {
   ReadingPoint,
   Station,
   TelemetryDevice,
+  Unit,
+  UnitStats,
+  DispatchRecord,
+  AnalyticsSummary,
 } from "@/api/types";

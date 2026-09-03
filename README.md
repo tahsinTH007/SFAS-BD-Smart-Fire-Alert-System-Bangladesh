@@ -66,6 +66,8 @@ Set `MONGO_URI` in `backend/.env`, then:
 cd backend && npm run seed && npm run dev
 ```
 
+`npm run seed:units` adds response units and their crews on top of that.
+
 Upgrading an existing database? `npm run backfill:station -- UTT-02` assigns a
 station to alerts created before the console became station-scoped (inferring
 from each alert's device, then its building, then the fallback code given).
@@ -111,9 +113,53 @@ acknowledge → resolve workflow.
 **My profile** (`/profile`) — operator identity (the name written onto every
 acknowledgement), your station posting, and a record of what you have handled.
 
-**Settings** (`/settings`) — which station this console serves, alerting
-behaviour, live system status with socket round-trip time, and the detection
-thresholds in force.
+**Settings** (`/settings`) — which station this console serves, colour theme
+(light / dark / system), alerting behaviour, live system status with socket
+round-trip time, and the detection thresholds in force.
+
+### Units, crew and dispatch
+
+The dashboard's **Units & Crew** tab is the station officer's unit board: which
+appliances are resting at station, which are en route or on scene, and which are
+out of service. Each unit expands to its full crew roster — rank, role, phone,
+blood group, certifications, years of service — and any crew member can be
+flipped on or off duty inline.
+
+From an incident, the **Dispatch** panel lists every available unit *ranked by
+arrival time*, pre-selects a sensible first alarm for the incident type (an
+engine always; medic and rescue for a critical; a ladder above the 4th floor;
+foam for a gas incident), and assigns them in one click. Dispatching also
+acknowledges the incident, because that is what it means.
+
+Each dispatch then moves through **assigned → rolling → on scene → cleared**,
+and those timestamps feed the response-time reporting.
+
+### Routing and ETA
+
+`backend/src/lib/routing.ts` estimates how long each unit will take to reach the
+incident. Units are ordered by **ETA, not distance** — a unit 3 km away across a
+rush-hour arterial can lose to one 5 km away on clear roads.
+
+Without a routing provider it multiplies straight-line distance by a road
+circuity factor (1.4 for Uttara's street grid) and divides by a speed that
+varies with the hour, because Dhaka traffic is the dominant term in any real
+response time: 14 km/h in the morning rush, 12 in the evening, 34 overnight,
+plus 1.5 minutes turnout. Every figure is labelled as an estimate in the UI.
+
+Set `ROUTING_OSRM_URL` to an OSRM instance and it uses real road routes instead,
+including the polyline.
+
+### Reporting
+
+The **Summary** tab answers the questions a station officer actually asks:
+
+- **Where** — alerts by sector, and the buildings raising most of them
+  (candidates for an inspection visit)
+- **What** — by incident type, with the share of each
+- **Why** — which sensors contributed, so a dominant cause is visible at source
+- **When** — alerts by hour of day, a staffing signal
+- **How fast** — average time to acknowledge and resolve, and actual travel time
+  measured against the estimated ETA
 
 ### Critical alerts
 
@@ -161,12 +207,16 @@ Base: `/api/v1`
 | Bulk | `PATCH /alerts/bulk/read` · `/bulk/acknowledge` · `POST /alerts/bulk/delete` |
 | Devices | full CRUD · `GET /devices/stats` · `/telemetry` · `/readings` · `GET /devices/:code/readings` · `POST /devices/heartbeat` |
 | Buildings / Stations | full CRUD · `GET /buildings/stats` |
+| Units | full CRUD · `GET /units/stats` · `PATCH /units/:id/status` · crew add/update/remove |
+| Dispatch | `GET /alerts/:id/units/recommend` · `POST /alerts/:id/dispatch` · `GET /alerts/:id/dispatches` · `GET /units/dispatches/active` · `PATCH /units/dispatches/:id/status` |
+| Analytics | `GET /analytics/summary` · `/areas` · `/causes` · `/response` |
 | Sensors | `POST /sensors/readings` (HTTP ingest) · `POST /sensors/evaluate` (score without storing) · `GET /sensors/serial-status` |
 | Health | `GET /health/live` · `/ready` · `/metrics` |
 
 Real-time over Socket.IO: `alert:new`, `alert:update`, `alert:delete`,
-`telemetry:reading`. A console emits `station:join` with its station id and is
-then served only that station's traffic.
+`telemetry:reading`, `unit:update`, `dispatch:new`, `dispatch:update`. A console
+emits `station:join` with its station id and is then served only that station's
+traffic.
 
 ---
 
@@ -180,14 +230,18 @@ backend/src
 │   ├── alerts/    controller · service · repository · validator
 │   ├── devices/   + telemetry history and API-key issuance
 │   ├── buildings/ · stations/
+│   ├── units/     unit board, crew roster, dispatch lifecycle
+│   ├── analytics/ area / type / cause / hour / response reporting
 │   └── sensors/   riskEngine · ingest service · serial listener
-├── routes/        · middlewares/ · lib/ · scripts/ (seed, simulate)
+├── lib/routing.ts ETA + route estimation
+├── routes/        · middlewares/ · scripts/ (seed, seed-units, simulate)
 
 frontend/src
 ├── app/           map · dashboard · notifications
 ├── api/           typed client
-├── components/    home · dashboard (+ charts) · notification(s) · navbar · ui
-├── redux/         alert + telemetry slices
+├── components/    home · dashboard (+ charts) · notification(s) · navbar
+│                  profile · settings · alerts · ui
+├── redux/         alert + telemetry + session slices
 └── socket/        Socket.IO client
 ```
 
@@ -200,3 +254,20 @@ protection and API token verification before exposing this anywhere public.
 
 Device API keys are issued once at creation and stored only as bcrypt hashes —
 they cannot be retrieved again.
+
+---
+
+## Theming
+
+Light, dark and system, via `next-themes` with a class on `<html>`.
+
+The console was authored dark-first and uses the slate ramp consistently — 950
+is the deepest surface, 900/800 are raised panels and hairlines, 300→50 climb
+from body text to headings. Light mode therefore **inverts that ramp** in
+`globals.css` rather than adding a `dark:` variant to ~840 utility classes
+across 41 files. Tailwind v4 compiles `bg-slate-900` to
+`var(--color-slate-900)`, so redefining those variables under `.light` re-skins
+every surface at once with no component churn and nothing to keep in sync.
+
+Status hues — red, amber, emerald, sky, orange — are deliberately not remapped: a
+critical alert stays red in both themes.

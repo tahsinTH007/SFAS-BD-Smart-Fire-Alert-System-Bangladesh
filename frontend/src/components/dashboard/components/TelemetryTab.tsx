@@ -40,13 +40,24 @@ export const TelemetryTab: React.FC<TelemetryTabProps> = ({
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return telemetry.filter((d) => {
-      if (onlyAlerting && d.readings.riskScore < 40) return false;
-      if (!q) return true;
-      return [d.deviceCode, d.label, d.building, d.room, d.sector]
-        .filter(Boolean)
-        .some((v) => String(v).toLowerCase().includes(q));
-    });
+    return telemetry
+      .filter((d) => {
+        if (onlyAlerting && d.readings.riskScore < 40) return false;
+        if (!q) return true;
+        return [d.deviceCode, d.label, d.building, d.room, d.sector]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q));
+      })
+      // Reporting units first, then the most dangerous of those. A unit that is
+      // actually sending data is the one an operator can act on, and a card
+      // that has to be scrolled to is a card nobody reads during an incident.
+      .sort((a, b) => {
+        if (a.online !== b.online) return a.online ? -1 : 1;
+        if (b.readings.riskScore !== a.readings.riskScore) {
+          return b.readings.riskScore - a.readings.riskScore;
+        }
+        return (a.label ?? a.deviceCode).localeCompare(b.label ?? b.deviceCode);
+      });
   }, [telemetry, query, onlyAlerting]);
 
   const alerting = telemetry.filter((d) => d.readings.riskScore >= 40).length;
@@ -169,7 +180,18 @@ const SensorCard: React.FC<{
           </p>
         </div>
 
-        {!device.online && (
+        {/* Both states get a badge. A silent card is ambiguous otherwise — an
+            operator cannot tell a unit reporting "all normal" from one that
+            stopped reporting an hour ago, and those mean opposite things. */}
+        {device.online ? (
+          <span className="flex shrink-0 items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-emerald-400">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            </span>
+            Live
+          </span>
+        ) : (
           <span className="shrink-0 rounded-md border border-slate-700 bg-slate-800/60 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-slate-500">
             Offline
           </span>

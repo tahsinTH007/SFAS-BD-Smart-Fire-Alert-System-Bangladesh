@@ -42,6 +42,7 @@ import { alertApi } from "@/api/alertApi";
 import { Panel } from "@/components/dashboard/components/Primitives";
 import { RiskMeter } from "@/components/dashboard/components/charts/RiskMeter";
 import { STATUS } from "@/components/dashboard/components/charts/tokens";
+import { DispatchPanel } from "./DispatchPanel";
 import type { AlertResponse } from "@/api/types";
 
 const PRIORITY_ICON = {
@@ -481,6 +482,8 @@ const SingleNotificationPage = () => {
 
         {/* ── Sidebar ─────────────────────────────────────────────────── */}
         <div className="flex flex-col gap-5">
+          <DispatchPanel alertId={a.id} resolved={isResolved} />
+
           <Panel title="Response status" icon={ShieldCheck}>
             <ul className="flex flex-col gap-3">
               <StatusRow

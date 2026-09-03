@@ -9,6 +9,8 @@ import { useDashboard } from "./hooks/useDashboard";
 import { TabNav } from "./components/TabNav";
 import { OverviewTab } from "./components/OverviewTab";
 import { TelemetryTab } from "./components/TelemetryTab";
+import { UnitsTab } from "./components/UnitsTab";
+import { SummaryTab } from "./components/SummaryTab";
 import { DevicesTable } from "./components/DevicesTable";
 import { BuildingsTable } from "./components/BuildingsTable";
 import { StationsTable } from "./components/StationsTable";
@@ -94,6 +96,7 @@ const Dashboard = () => {
             buildings: d.buildings.length,
             stations: d.stations.length,
             telemetry: d.telemetry.length,
+            units: d.units.length,
           }}
         />
 
@@ -108,6 +111,27 @@ const Dashboard = () => {
             trendHours={d.trendHours}
             onTrendHoursChange={d.setTrendHours}
             socketConnected={d.socketConnected}
+            loading={d.loading}
+          />
+        )}
+
+        {d.activeTab === "units" && (
+          <UnitsTab
+            units={d.units}
+            stats={d.unitStats}
+            activeDispatches={d.activeDispatches}
+            loading={d.loading}
+            onSetStatus={d.setUnitStatus}
+            onSetCrewDuty={d.setCrewDuty}
+            onDispatchStatus={d.setDispatchStatus}
+          />
+        )}
+
+        {d.activeTab === "summary" && (
+          <SummaryTab
+            summary={d.summary}
+            days={d.summaryDays}
+            onDaysChange={d.setSummaryDays}
             loading={d.loading}
           />
         )}

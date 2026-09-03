@@ -13,9 +13,19 @@ const configured = env.CORS_ALLOWED_ORIGINS.split(",")
 
 const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
+/**
+ * RFC1918 ranges — the console is routinely opened from a phone or a second
+ * laptop on the same router as the host PC, which arrives as
+ * `http://192.168.x.x:3000` rather than localhost. That address changes with
+ * every venue, so it cannot be pinned in CORS_ALLOWED_ORIGINS; the whole
+ * private range is accepted instead, and only in development.
+ */
+const PRIVATE_LAN =
+  /^https?:\/\/(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})(:\d+)?$/;
+
 export function isOriginAllowed(origin: string): boolean {
   if (configured.includes(origin)) return true;
-  if (isDev && LOCALHOST.test(origin)) return true;
+  if (isDev && (LOCALHOST.test(origin) || PRIVATE_LAN.test(origin))) return true;
   return false;
 }
 

@@ -14,6 +14,7 @@ import {
   Monitor,
   Radio,
   Server,
+  Palette,
   Settings as SettingsIcon,
   Usb,
   Volume2,
@@ -33,6 +34,8 @@ import {
 } from "@/socket/socketClient";
 import { sensorApi, systemApi } from "@/api/systemApi";
 import { Panel } from "@/components/dashboard/components/Primitives";
+import { ToggleSwitch } from "@/components/ui/toggle-switch";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { API_BASE_URL, SOCKET_URL } from "@/lib/config";
 import type { HealthReport, SerialStatus } from "@/api/types";
 
@@ -48,6 +51,14 @@ const SettingsPage = () => {
   const [health, setHealth] = useState<HealthReport | null>(null);
   const [serial, setSerial] = useState<SerialStatus | null>(null);
   const [latency, setLatency] = useState<number | null>(null);
+
+  // These resolve against window.location, so they differ between the server
+  // pre-render and the browser. Reading them after mount keeps the shown value
+  // honest without tripping a hydration mismatch.
+  const [endpoints, setEndpoints] = useState({ api: "—", socket: "—" });
+  useEffect(() => {
+    setEndpoints({ api: API_BASE_URL, socket: SOCKET_URL });
+  }, []);
 
   useEffect(() => {
     systemApi.health().then(setHealth).catch(() => setHealth(null));
@@ -174,6 +185,24 @@ const SettingsPage = () => {
           )}
         </Panel>
 
+        {/* ── Appearance ──────────────────────────────────────────────── */}
+        <Panel
+          title="Appearance"
+          subtitle="Applies to this browser only"
+          icon={Palette}
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-slate-200">Colour theme</p>
+              <p className="mt-0.5 text-[11px] leading-relaxed text-slate-500">
+                Dark suits a control room at night; System follows the operating
+                system so screens dim on their own.
+              </p>
+            </div>
+            <ThemeToggle className="shrink-0" />
+          </div>
+        </Panel>
+
         {/* ── Alerting ────────────────────────────────────────────────── */}
         <Panel
           title="Alerting"
@@ -295,8 +324,8 @@ const SettingsPage = () => {
           </ul>
 
           <dl className="mt-4 grid gap-2 border-t border-slate-800 pt-4 sm:grid-cols-2">
-            <Meta label="API endpoint" value={API_BASE_URL} />
-            <Meta label="Socket endpoint" value={SOCKET_URL} />
+            <Meta label="API endpoint" value={endpoints.api} />
+            <Meta label="Socket endpoint" value={endpoints.socket} />
             <Meta label="Environment" value={health?.env ?? "—"} />
             <Meta
               label="Detected serial ports"
@@ -356,7 +385,7 @@ const Toggle: React.FC<{
   title: string;
   description: string;
   checked: boolean;
-  onChange: () => void;
+  onChange: (next: boolean) => void;
   action?: React.ReactNode;
 }> = ({ icon: Icon, title, description, checked, onChange, action }) => (
   <div className="flex items-start gap-3 py-3.5 first:pt-0 last:pb-0">
@@ -372,21 +401,13 @@ const Toggle: React.FC<{
       </p>
     </div>
 
-    <button
-      role="switch"
-      aria-checked={checked}
-      aria-label={title}
-      onClick={onChange}
-      className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${
-        checked ? "bg-orange-600" : "bg-slate-700"
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition-transform ${
-          checked ? "translate-x-[22px]" : "translate-x-0.5"
-        }`}
-      />
-    </button>
+    <ToggleSwitch
+      checked={checked}
+      onChange={onChange}
+      label={title}
+      hideLabel
+      className="mt-0.5 shrink-0"
+    />
   </div>
 );
 

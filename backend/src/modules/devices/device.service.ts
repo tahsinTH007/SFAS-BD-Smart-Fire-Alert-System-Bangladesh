@@ -165,13 +165,22 @@ export async function getLiveTelemetry(stationId?: string) {
 }
 
 /** Called by a device to say "I'm alive" without sending a full reading. */
+/**
+ * The API listens on `::`, so Node reports IPv4 clients as IPv4-mapped IPv6
+ * (`::ffff:192.168.0.101`). A field unit's address is meant to be read off the
+ * dashboard and typed into a browser, so store the plain IPv4 form.
+ */
+function normalizeIp(ip: string): string {
+  return ip.startsWith("::ffff:") ? ip.slice(7) : ip;
+}
+
 export async function heartbeat(deviceCode: string, ipAddress?: string) {
   const device = await repoFindByDeviceCode(deviceCode);
   if (!device) throw new NotFoundError(`Unknown device: ${deviceCode}`);
 
   device.lastHeartbeatAt = new Date();
   device.lastSeenAt = new Date();
-  if (ipAddress) device.ipAddress = ipAddress;
+  if (ipAddress) device.ipAddress = normalizeIp(ipAddress);
   await device.save();
 
   await cacheInvalidate("devices:*");

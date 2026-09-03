@@ -4,6 +4,22 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {
+  /* ── Tokens used by the shared toggle component ────────────────────────────
+     `bg-neutral-quaternary`, `bg-brand`, `ring-brand-soft`, `text-heading` and
+     `border-buffer` come from the house design language; they are defined here
+     so the standard toggle markup drops in unchanged, and they follow the
+     active theme. */
+  --color-brand: var(--brand);
+  --color-brand-soft: var(--brand-soft);
+  --color-neutral-quaternary: var(--neutral-quaternary);
+  --color-buffer: var(--buffer);
+  --color-heading: var(--heading);
+  --color-body: var(--body);
+  --color-subtle: var(--subtle);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-hairline: var(--hairline);
+
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
@@ -47,6 +63,18 @@
 }
 
 :root {
+  /* House tokens — light */
+  --brand: #ea580c;
+  --brand-soft: #fed7aa;
+  --neutral-quaternary: #cbd5e1;
+  --buffer: #ffffff;
+  --heading: #0f172a;
+  --body: #334155;
+  --subtle: #64748b;
+  --surface: #ffffff;
+  --surface-raised: #f8fafc;
+  --hairline: #e2e8f0;
+
   --radius: 0.625rem;
   --background: oklch(1 0 0);
   --foreground: oklch(0.129 0.042 264.695);
@@ -82,6 +110,18 @@
 }
 
 .dark {
+  /* House tokens — dark */
+  --brand: #f97316;
+  --brand-soft: rgba(249, 115, 22, 0.28);
+  --neutral-quaternary: #334155;
+  --buffer: #0f172a;
+  --heading: #f8fafc;
+  --body: #cbd5e1;
+  --subtle: #94a3b8;
+  --surface: #0f172a;
+  --surface-raised: #1e293b;
+  --hairline: #1e293b;
+
   --background: oklch(0.129 0.042 264.695);
   --foreground: oklch(0.984 0.003 247.858);
   --card: oklch(0.208 0.042 265.755);
@@ -249,4 +289,65 @@
   .animate-ping {
     animation: none !important;
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   Light theme
+   ─────────────────────────────────────────────────────────────────────────────
+
+   The console was authored dark-first, and it uses the slate ramp *semantically*
+   and consistently: 950 is the deepest surface, 900/800 are raised panels and
+   hairlines, and 300→50 climb from body text to headings.
+
+   Because that ordering is consistent, light mode is produced by inverting the
+   ramp itself rather than by adding a `dark:` variant to ~840 utility classes
+   across 41 files. Tailwind v4 compiles `bg-slate-900` to
+   `background-color: var(--color-slate-900)`, so redefining those variables
+   under `.light` re-skins every surface at once, with no component churn and
+   nothing to keep in sync.
+
+   Status hues (red / amber / emerald / sky / orange) are deliberately NOT
+   remapped: a critical alert must stay red in both themes.
+   ───────────────────────────────────────────────────────────────────────────── */
+
+.light {
+  /* Surfaces — deepest → raised */
+  --color-slate-950: #ffffff;
+  --color-slate-900: #f8fafc;
+  --color-slate-800: #e2e8f0;
+  --color-slate-700: #cbd5e1;
+
+  /* Text — muted → heading */
+  --color-slate-600: #64748b;
+  --color-slate-500: #475569;
+  --color-slate-400: #334155;
+  --color-slate-300: #1e293b;
+  --color-slate-200: #0f172a;
+  --color-slate-100: #0f172a;
+  --color-slate-50: #020617;
+}
+
+/* The dark basemap filter is a dark-mode device; in light mode show the tiles
+   as OpenStreetMap draws them. */
+.light .sfas-dark-tiles {
+  filter: none;
+}
+
+.light .leaflet-container {
+  background: #e2e8f0;
+}
+
+.light .leaflet-control-zoom a {
+  background: rgba(255, 255, 255, 0.95) !important;
+  color: #334155 !important;
+  border-color: #cbd5e1 !important;
+}
+
+.light .leaflet-control-attribution {
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #64748b !important;
+}
+
+.light .sfas-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.7);
 }

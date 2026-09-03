@@ -21,6 +21,7 @@ import {
 import type { RootState } from "@/redux/store";
 import { selectActiveStation } from "@/redux/slices/sessionSlice";
 import { NotificationBell } from "./components/NotificationBell";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { ProfileMenu } from "./components/ProfileMenu";
 import { cn } from "@/lib/utils";
 
@@ -128,9 +129,14 @@ const Navbar = () => {
                 {connected ? "Live" : "Offline"}
               </span>
 
-              <NotificationBell />
+              {/* Bell is mobile-only: on desktop the "Alerts" nav link already
+                  leads to the full console, so the dropdown is redundant. */}
+              <div className="md:hidden">
+                <NotificationBell />
+              </div>
 
-              <div className="hidden md:block">
+              <div className="hidden items-center gap-2 md:flex">
+                <ThemeToggle />
                 <ProfileMenu />
               </div>
 
@@ -217,6 +223,13 @@ const Navbar = () => {
             </nav>
 
             <div className="border-t border-slate-800 px-4 py-3">
+              <div className="mb-3">
+                <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-slate-600">
+                  Theme
+                </p>
+                <ThemeToggle className="w-full justify-between" />
+              </div>
+
               <span
                 className={cn(
                   "flex items-center justify-center gap-2 rounded-lg border py-2 text-[11px] font-bold uppercase tracking-wider",

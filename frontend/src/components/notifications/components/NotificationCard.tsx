@@ -7,7 +7,7 @@ import {
   Shield,
   EyeOff,
   Trash2,
-  ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { Notification, Priority } from "../types/notification";
 import { PRIORITY_META, PriorityMeta } from "../config/priorityMeta";
@@ -67,11 +67,10 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
   return (
     <div
       className={`
-        relative flex gap-3 px-4 py-3.5 transition-all duration-200 cursor-pointer border-b border-slate-800/60 last:border-b-0
+        relative flex gap-3 px-4 py-3.5 transition-all duration-200 border-b border-slate-800/60 last:border-b-0
         ${selected ? "bg-slate-700/40" : "hover:bg-slate-800/40"}
         ${!notification.read ? meta.bg : ""}
       `}
-      onClick={() => onSelect(notification.id)}
     >
       {/* Left priority bar */}
       <div
@@ -104,11 +103,15 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
         )}
       </div>
 
-      {/* Content */}
-      <div className="flex-1 min-w-0">
+      {/* Content — the whole block opens the incident */}
+      <Link
+        href={`/notifications/${notification.id}`}
+        className="flex-1 min-w-0 group"
+        aria-label={`Open incident: ${notification.title}`}
+      >
         <div className="flex items-center justify-between gap-2 flex-wrap">
           <h4
-            className={`text-sm truncate ${
+            className={`text-sm truncate group-hover:text-sky-300 transition-colors ${
               notification.read
                 ? "text-slate-500 font-medium"
                 : "text-slate-100 font-semibold"
@@ -161,30 +164,19 @@ export const NotificationCard: React.FC<NotificationCardProps> = ({
             {notification.timestamp}
           </span>
         </div>
-      </div>
+
+        {/* A real, reachable call to action rather than a 14px icon */}
+        <span className="mt-2.5 inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-[11px] font-semibold text-slate-300 transition-colors group-hover:border-sky-600/60 group-hover:bg-sky-600/10 group-hover:text-sky-300">
+          View details
+          <ArrowRight size={12} className="transition-transform group-hover:translate-x-0.5" />
+        </span>
+      </Link>
 
       {/* Quick action buttons */}
       <div
         className="shrink-0 flex flex-col items-end gap-1"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* View Details */}
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href={`/notifications/${notification.id}`}
-                className="p-1.5 rounded-md text-slate-500 hover:text-emerald-400 hover:bg-slate-700/60 transition-colors"
-              >
-                <ExternalLink size={14} />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent className="bg-slate-800 text-slate-200 text-xs border-slate-700">
-              View Details
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-
         {!notification.acknowledged && notification.priority === "critical" && (
           <TooltipProvider>
             <Tooltip>

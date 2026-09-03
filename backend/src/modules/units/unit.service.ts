@@ -26,6 +26,25 @@ function scope(stationId?: string) {
 /** Units that may be assigned right now. */
 const ASSIGNABLE = ["available"];
 
+type CrewMember = { onDuty?: boolean | null };
+
+/**
+ * Adds the derived fields the UI needs. Mongoose schema virtuals do not survive
+ * `.lean()` without the mongoose-lean-virtuals plugin, so they are computed here
+ * rather than silently coming back undefined.
+ */
+function decorate<T extends { crew?: CrewMember[] | null; status?: string }>(
+  unit: T,
+) {
+  const crew = unit.crew ?? [];
+  return {
+    ...unit,
+    crewTotal: crew.length,
+    crewOnDuty: crew.filter((c) => c.onDuty !== false).length,
+    assignable: unit.status === "available",
+  };
+}
+
 // ─── CRUD ─────────────────────────────────────────────────────────────────────
 
 export async function createUnit(input: UnitInput) {
@@ -66,18 +85,18 @@ export async function getUnits(params: {
   const units = await Unit.find(filter)
     .populate("currentAlertId", "title priority location incident status")
     .sort({ status: 1, unitCode: 1 })
-    .lean({ virtuals: true });
+    .lean();
 
-  return units;
+  return units.map(decorate);
 }
 
 export async function getUnitById(id: string) {
   if (!isValidId(id)) throw new BadRequestError(`Malformed unit ID: ${id}`);
   const unit = await Unit.findById(id)
     .populate("currentAlertId", "title priority location incident status")
-    .lean({ virtuals: true });
+    .lean();
   if (!unit) throw new NotFoundError("Unit not found");
-  return unit;
+  return decorate(unit);
 }
 
 export async function updateUnit(id: string, updates: Partial<UnitInput>) {
@@ -90,10 +109,10 @@ export async function updateUnit(id: string, updates: Partial<UnitInput>) {
   }
   if (updates.stationId) set.stationId = new Types.ObjectId(updates.stationId);
 
-  const unit = await Unit.findByIdAndUpdate(id, { $set: set }, { new: true })
-    .lean({ virtuals: true });
-  if (!unit) throw new NotFoundError("Unit not found");
+  const raw = await Unit.findByIdAndUpdate(id, { $set: set }, { new: true }).lean();
+  if (!raw) throw new NotFoundError("Unit not found");
 
+  const unit = decorate(raw);
   emitToAll("unit:update", unit);
   return unit;
 }
@@ -140,7 +159,7 @@ export async function setUnitStatus(id: string, status: string, note?: string) {
   }
   await unit.save();
 
-  const plain = unit.toObject({ virtuals: true });
+  const plain = decorate(unit.toObject());
   emitToAll("unit:update", plain);
   return plain;
 }
@@ -153,10 +172,11 @@ export async function addCrew(unitId: string, member: CrewInput) {
     unitId,
     { $push: { crew: member } },
     { new: true },
-  ).lean({ virtuals: true });
+  ).lean();
   if (!unit) throw new NotFoundError("Unit not found");
-  emitToAll("unit:update", unit);
-  return unit;
+  const out = decorate(unit);
+  emitToAll("unit:update", out);
+  return out;
 }
 
 export async function updateCrew(
@@ -176,11 +196,12 @@ export async function updateCrew(
     { _id: unitId, "crew._id": crewId },
     { $set: set },
     { new: true },
-  ).lean({ virtuals: true });
+  ).lean();
 
   if (!unit) throw new NotFoundError("Unit or crew member not found");
-  emitToAll("unit:update", unit);
-  return unit;
+  const out = decorate(unit);
+  emitToAll("unit:update", out);
+  return out;
 }
 
 export async function removeCrew(unitId: string, crewId: string) {
@@ -191,10 +212,11 @@ export async function removeCrew(unitId: string, crewId: string) {
     unitId,
     { $pull: { crew: { _id: new Types.ObjectId(crewId) } } },
     { new: true },
-  ).lean({ virtuals: true });
+  ).lean();
   if (!unit) throw new NotFoundError("Unit not found");
-  emitToAll("unit:update", unit);
-  return unit;
+  const out = decorate(unit);
+  emitToAll("unit:update", out);
+  return out;
 }
 
 // ─── Dispatch ─────────────────────────────────────────────────────────────────
@@ -227,7 +249,10 @@ export async function recommendUnits(alertId: string, stationId?: string) {
     ...scope(stationId ?? String(alert.stationId ?? "")),
   };
 
-  const units = (await Unit.find(filter).lean({ virtuals: true })) as unknown as (Record<string, unknown> & {
+  const units = (await Unit.find(filter).lean()).map(decorate) as unknown as (Record<
+    string,
+    unknown
+  > & {
     type: string;
     location?: { coordinates: number[] } | null;
   })[];
@@ -317,7 +342,7 @@ export async function dispatchUnits(
     await unit.save();
 
     created.push(dispatch.toObject());
-    emitToAll("unit:update", unit.toObject({ virtuals: true }));
+    emitToAll("unit:update", decorate(unit.toObject()));
   }
 
   // Dispatching is itself an acknowledgement of the incident.
@@ -376,7 +401,7 @@ export async function updateDispatchStatus(
         unit.dispatchedAt = null;
       }
       await unit.save();
-      emitToAll("unit:update", unit.toObject({ virtuals: true }));
+      emitToAll("unit:update", decorate(unit.toObject()));
     }
   }
 

@@ -245,3 +245,186 @@ export interface HealthReport {
     serial: { required: boolean; up: boolean; port: string; lastLineAt: string | null };
   };
 }
+
+// ─── Units & dispatch ────────────────────────────────────────────────────────
+
+export type UnitType =
+  | "engine"
+  | "ladder"
+  | "rescue"
+  | "medic"
+  | "foam"
+  | "water_tender"
+  | "command";
+
+export type UnitStatus =
+  | "available"
+  | "dispatched"
+  | "on_scene"
+  | "returning"
+  | "maintenance"
+  | "off_duty";
+
+export type CrewRole =
+  | "officer"
+  | "driver"
+  | "firefighter"
+  | "paramedic"
+  | "technician"
+  | "rescuer";
+
+export interface CrewMember {
+  _id?: string;
+  name: string;
+  rank: string;
+  role: CrewRole;
+  phone: string | null;
+  bloodGroup: string | null;
+  certifications: string[];
+  yearsOfService: number;
+  onDuty: boolean;
+}
+
+export interface RouteEstimate {
+  distanceKm: number;
+  etaMinutes: number;
+  source: "estimate" | "osrm";
+  geometry: [number, number][];
+  basis: string;
+}
+
+export interface Unit {
+  _id: string;
+  unitCode: string;
+  name: string;
+  type: UnitType;
+  stationId: string;
+  status: UnitStatus;
+  crew: CrewMember[];
+  crewTotal: number;
+  crewOnDuty: number;
+  assignable: boolean;
+  registration: string | null;
+  waterCapacityL: number;
+  ladderReachM: number;
+  location?: { type: string; coordinates: [number, number] };
+  currentAlertId?:
+    | { _id: string; title: string; priority: string; location: string; incident: string; status: string }
+    | string
+    | null;
+  dispatchedAt: string | null;
+  note: string | null;
+  /** Only present on the dispatch recommendation endpoint. */
+  route?: RouteEstimate | null;
+  recommended?: boolean;
+}
+
+export interface UnitStats {
+  total: number;
+  available: number;
+  dispatched: number;
+  onScene: number;
+  returning: number;
+  maintenance: number;
+  offDuty: number;
+  byType: Record<string, number>;
+  crew: { total: number; onDuty: number };
+}
+
+export type DispatchStatus =
+  | "assigned"
+  | "en_route"
+  | "on_scene"
+  | "cleared"
+  | "cancelled";
+
+export interface DispatchRecord {
+  _id: string;
+  alertId: string | { _id: string; title: string; priority: string; location: string; incident: string; coordinates?: [number, number] };
+  unitId: string | Pick<Unit, "_id" | "unitCode" | "name" | "type" | "status" | "crew" | "location">;
+  status: DispatchStatus;
+  dispatchedBy: string;
+  distanceKm: number | null;
+  etaMinutes: number | null;
+  routeSource: "estimate" | "osrm";
+  routeGeometry: [number, number][];
+  assignedAt: string;
+  enRouteAt: string | null;
+  arrivedAt: string | null;
+  clearedAt: string | null;
+  note: string | null;
+}
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+
+export interface AreaStat {
+  area: string;
+  total: number;
+  critical: number;
+  important: number;
+  avgRisk: number;
+  buildingCount: number;
+  lastAt: string;
+}
+
+export interface BuildingStat {
+  building: string;
+  sector?: string;
+  total: number;
+  critical: number;
+  avgRisk: number;
+  lastAt: string;
+}
+
+export interface TypeStat {
+  type: string;
+  total: number;
+  critical: number;
+  avgRisk: number;
+}
+
+export interface CauseStat {
+  factor: string;
+  label: string;
+  total: number;
+  critical: number;
+}
+
+export interface HourStat {
+  hour: number;
+  total: number;
+  critical: number;
+}
+
+export interface DeviceStat {
+  deviceCode: string;
+  building?: string;
+  total: number;
+  critical: number;
+  resolved: number;
+  avgRisk: number;
+  lastAt: string;
+}
+
+export interface ResponseMetrics {
+  acknowledged: number;
+  avgAckMinutes: number | null;
+  slowestAckMinutes: number | null;
+  resolvedCount: number;
+  avgResolveMinutes: number | null;
+  dispatchesArrived: number;
+  avgActualTravelMinutes: number | null;
+  avgEstimatedEtaMinutes: number | null;
+  avgDistanceKm: number | null;
+}
+
+export interface AnalyticsSummary {
+  days: number;
+  areas: AreaStat[];
+  buildings: BuildingStat[];
+  types: TypeStat[];
+  causes: CauseStat[];
+  hourly: HourStat[];
+  devices: DeviceStat[];
+  response: ResponseMetrics;
+}

@@ -218,11 +218,26 @@ export const DevicesTable: React.FC<DevicesTableProps> = ({
       sortable: true,
       accessor: (d) => d.lastSeenAt ?? "",
       render: (d) => (
-        <span className="text-[11px] text-slate-500">
-          {d.lastSeenAt
-            ? new Date(d.lastSeenAt).toLocaleString()
-            : "Never reported"}
-        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] text-slate-500">
+            {d.lastSeenAt
+              ? new Date(d.lastSeenAt).toLocaleString()
+              : "Never reported"}
+          </p>
+          {/* A battery unit has no serial console, so the address it last
+              checked in from is the only way to reach its config page. */}
+          {d.ipAddress && (
+            <a
+              href={`http://${d.ipAddress}/`}
+              target="_blank"
+              rel="noreferrer"
+              title={`Open ${d.deviceCode} configuration page`}
+              className="font-mono text-[11px] text-sky-500 hover:text-sky-400 hover:underline"
+            >
+              {d.ipAddress}
+            </a>
+          )}
+        </div>
       ),
     },
     {

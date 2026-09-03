@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { ThemeProvider } from "next-themes";
 import ReduxProvider from "@/redux/provider";
 import { connectSocket, joinStation, unlockAudio } from "@/socket/socketClient";
 import { fetchStations, hydrate } from "@/redux/slices/sessionSlice";
@@ -53,8 +54,15 @@ function SessionBootstrap({ children }: { children: React.ReactNode }) {
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <ReduxProvider>
-      <SessionBootstrap>{children}</SessionBootstrap>
-    </ReduxProvider>
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="dark"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <ReduxProvider>
+        <SessionBootstrap>{children}</SessionBootstrap>
+      </ReduxProvider>
+    </ThemeProvider>
   );
 }
