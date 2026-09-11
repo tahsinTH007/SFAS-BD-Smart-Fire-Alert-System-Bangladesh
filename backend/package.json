@@ -11,7 +11,9 @@
     "seed": "tsx src/scripts/seed.ts",
     "simulate": "tsx src/scripts/simulate.ts",
     "backfill:station": "tsx src/scripts/backfill-station.ts",
-    "seed:units": "tsx src/scripts/seed-units.ts"
+    "seed:units": "tsx src/scripts/seed-units.ts",
+    "export:data": "tsx src/scripts/export-data.ts",
+    "import:data": "tsx src/scripts/import-data.ts"
   },
   "keywords": [],
   "author": "",
