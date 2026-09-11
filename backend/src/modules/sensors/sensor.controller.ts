@@ -1,6 +1,8 @@
 import { asyncHandler } from "../../lib/asyncHandler.js";
 import { validate } from "../../lib/validation.js";
 import { getSerialStatus, listSerialPorts } from "../../config/serial.js";
+import { env } from "../../config/env.js";
+import { getSimulatorStatus } from "./simulator.js";
 import { sensorReadingSchema } from "../devices/device.validator.js";
 import { assessRisk } from "./riskEngine.js";
 import { ingestReading } from "./sensor.service.js";
@@ -32,5 +34,13 @@ export const serialStatus = asyncHandler(async (_req, res) => {
     Promise.resolve(getSerialStatus()),
     listSerialPorts(),
   ]);
-  res.json({ success: true, data: { ...status, availablePorts: ports } });
+  res.json({
+    success: true,
+    data: {
+      ...status,
+      enabled: env.SERIAL_ENABLED === "true",
+      availablePorts: ports,
+      simulator: getSimulatorStatus(),
+    },
+  });
 });

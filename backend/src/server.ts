@@ -9,6 +9,7 @@ import { initSocket } from "./config/socket.js";
 import { client as redis } from "./config/redis.js";
 import { closeSerial } from "./config/serial.js";
 import { initSensorListener } from "./modules/sensors/sensor.listener.js";
+import { startSimulator, stopSimulator } from "./modules/sensors/simulator.js";
 
 async function bootStrap() {
   try {
@@ -19,6 +20,8 @@ async function bootStrap() {
 
     initSocket(server);
     initSensorListener();
+    // Synthetic units for hosted demos — a no-op unless DEVICE_SIMULATOR=true.
+    void startSimulator();
 
     const port = numeric.port || 5000;
 
@@ -44,6 +47,7 @@ async function bootStrap() {
 
       server.close(async () => {
         try {
+          stopSimulator();
           closeSerial();
           await disconnectDB();
           redis.disconnect();

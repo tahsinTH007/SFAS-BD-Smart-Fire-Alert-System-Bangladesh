@@ -26,6 +26,14 @@ const envSchema = z.object({
   SERIAL_DATA_FORMAT: z.enum(["json", "csv", "raw"]).default("json"),
   SERIAL_ENABLED: z.string().default("true"),
 
+  // Built-in device simulator — synthetic OGNIBORMO units driven through the
+  // real ingest pipeline from inside the API process, for hosted demos where
+  // no hardware can be attached. See modules/sensors/simulator.ts.
+  DEVICE_SIMULATOR: z.string().default("false"),
+  DEVICE_SIMULATOR_COUNT: z.string().default("4"),
+  DEVICE_SIMULATOR_DEVICES: z.string().optional(),
+  DEVICE_SIMULATOR_INTERVAL_MS: z.string().default("3000"),
+
   // Socket.IO
   SOCKET_PATH: z.string().default("/socket.io"),
   SOCKET_CORS_ORIGIN: z.string().default("http://localhost:3000"),
@@ -60,7 +68,9 @@ const envSchema = z.object({
   // for real road routes; without it ETAs are estimated locally.
   ROUTING_OSRM_URL: z.string().url().optional(),
 
-  // Redis
+  // Redis — REDIS_ENABLED=false skips the connection entirely (hosted demos
+  // without a Redis instance); caching is off and rate limits are in-memory.
+  REDIS_ENABLED: z.string().default("true"),
   REDIS_USERNAME: z.string().optional().default(""),
   REDIS_PASSWORD: z.string().optional().default(""),
   REDIS_HOST: z.string().default("127.0.0.1"),
@@ -85,6 +95,11 @@ export const isDev = env.NODE_ENV === "development";
 
 export const numeric = {
   port: Number(env.PORT),
+  simulatorCount: Math.max(1, Number(env.DEVICE_SIMULATOR_COUNT) || 4),
+  simulatorIntervalMs: Math.max(
+    1000,
+    Number(env.DEVICE_SIMULATOR_INTERVAL_MS) || 3000,
+  ),
   smokeThreshold: Number(env.SMOKE_THRESHOLD),
   gasThreshold: Number(env.GAS_THRESHOLD),
   tempThreshold: Number(env.TEMP_THRESHOLD),

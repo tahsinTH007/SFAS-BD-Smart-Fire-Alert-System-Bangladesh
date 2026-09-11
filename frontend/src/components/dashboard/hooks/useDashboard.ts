@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useDispatch, useSelector } from "react-redux";
 import type { AppDispatch, RootState } from "@/redux/store";
@@ -65,6 +65,17 @@ export const useDashboard = () => {
 
   // ── Loading ────────────────────────────────────────────────────────────────
 
+  // Each loader closes over the station it was called for. If the console has
+  // moved to another station by the time its response arrives (first load
+  // hydrates the saved station a moment after mount; a slow API makes the gap
+  // wide), the result is for the wrong console and is dropped — the reload
+  // triggered by the station change supplies the right one.
+  const stationRef = useRef(stationId);
+  useEffect(() => {
+    stationRef.current = stationId;
+  }, [stationId]);
+  const stale = useCallback(() => stationRef.current !== stationId, [stationId]);
+
   const loadCore = useCallback(async () => {
     try {
       // Devices and buildings are scoped to this console's station; the station
@@ -76,15 +87,17 @@ export const useDashboard = () => {
         stationApi.list({ limit: 200 }),
         buildingApi.stats(scope),
       ]);
+      if (stale()) return;
       setDevices(d.items);
       setBuildings(b.items);
       setStations(s.items);
       setBuildingStats(bs);
       setError(null);
     } catch (err) {
+      if (stale()) return;
       setError(toApiError(err).message);
     }
-  }, [stationId]);
+  }, [stationId, stale]);
 
   const loadAnalytics = useCallback(
     async (hours: number) => {
@@ -93,13 +106,14 @@ export const useDashboard = () => {
         alertApi.getTimeseries(hours, stationId ?? undefined),
         alertApi.getTopDevices(6, stationId ?? undefined),
       ]);
+      if (stale()) return;
       setTimeseries(ts);
       setTopDevices(top);
     } catch {
       // Analytics are supplementary; the rest of the dashboard still renders.
     }
     },
-    [stationId],
+    [stationId, stale],
   );
 
   const loadUnits = useCallback(async () => {
@@ -110,23 +124,27 @@ export const useDashboard = () => {
         unitApi.stats(scope),
         unitApi.activeDispatches(scope),
       ]);
+      if (stale()) return;
       setUnits(u);
       setUnitStats(us);
       setActiveDispatches(ad);
     } catch {
       // The unit board is one tab; a failure here must not blank the dashboard.
     }
-  }, [stationId]);
+  }, [stationId, stale]);
 
   const loadSummary = useCallback(
     async (days: number) => {
       try {
-        setSummary(await analyticsApi.summary(stationId ?? undefined, days));
+        const summary = await analyticsApi.summary(stationId ?? undefined, days);
+        if (stale()) return;
+        setSummary(summary);
       } catch {
+        if (stale()) return;
         setSummary(null);
       }
     },
-    [stationId],
+    [stationId, stale],
   );
 
   const loadHealth = useCallback(async () => {

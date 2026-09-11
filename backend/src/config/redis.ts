@@ -10,12 +10,16 @@ import { logger } from "../lib/logger.js";
  * while the socket is down queue up silently and every HTTP request that awaits
  * one blocks until the connection returns.
  */
+export const redisEnabled = env.REDIS_ENABLED !== "false";
+
 export const client = new Redis({
   host: env.REDIS_HOST,
   port: Number(env.REDIS_PORT),
   username: env.REDIS_USERNAME || undefined,
   password: env.REDIS_PASSWORD || undefined,
-  lazyConnect: false,
+  // With Redis disabled the client is created but never connected (see
+  // below), so the rate limiters' insurance limiters take over immediately.
+  lazyConnect: !redisEnabled,
   enableOfflineQueue: false,
   maxRetriesPerRequest: 1,
   connectTimeout: 5_000,
@@ -31,6 +35,13 @@ export const client = new Redis({
 
 let ready = false;
 let loggedFailure = false;
+
+if (!redisEnabled) {
+  // Moves a lazy client straight to "end": every command rejects at once
+  // instead of triggering the deferred connect, and nothing ever retries.
+  client.disconnect();
+  logger.info("Redis disabled (REDIS_ENABLED=false) — caching off, rate limiting in-memory");
+}
 
 client.on("ready", () => {
   ready = true;

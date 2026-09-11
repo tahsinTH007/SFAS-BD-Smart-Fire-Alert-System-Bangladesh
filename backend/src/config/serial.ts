@@ -1,5 +1,4 @@
 import { EventEmitter } from "node:events";
-import { ReadlineParser, SerialPort } from "serialport";
 import { env } from "./env.js";
 import { logger } from "../lib/logger.js";
 
@@ -10,6 +9,11 @@ import { logger } from "../lib/logger.js";
  * the full API. So instead of exporting a live SerialPort (which threw on
  * import when COM4 was absent), this exports a stable emitter that reconnects
  * in the background and emits `line` for each newline-delimited frame.
+ *
+ * `serialport` is a native module and an optional dependency. It is loaded
+ * lazily, only when the link is actually opened, so a hosted deployment with
+ * SERIAL_ENABLED=false never touches it — and a failed native build on the
+ * host degrades to "serial unavailable" instead of crashing on import.
  */
 export const serialEvents = new EventEmitter();
 
@@ -35,7 +39,54 @@ export const getSerialStatus = (): SerialStatus => ({ ...status });
 
 const retryInterval = Number(env.SERIAL_RETRY_INTERVAL) || 5000;
 
-let port: SerialPort | null = null;
+// Minimal shape of what this module uses from `serialport`, so the compiled
+// output carries no static reference to the package.
+interface PortLike extends NodeJS.EventEmitter {
+  isOpen: boolean;
+  open(cb: (err: Error | null) => void): void;
+  close(): void;
+  pipe<T extends NodeJS.EventEmitter>(dest: T): T;
+}
+
+interface SerialModule {
+  SerialPort: {
+    new (
+      opts: { path: string; baudRate: number; autoOpen: boolean },
+      cb?: () => void,
+    ): PortLike;
+    list(): Promise<
+      {
+        path: string;
+        manufacturer?: string;
+        serialNumber?: string;
+        productId?: string;
+      }[]
+    >;
+  };
+  ReadlineParser: new (opts: { delimiter: string }) => NodeJS.EventEmitter;
+}
+
+let modulePromise: Promise<SerialModule | null> | null = null;
+
+// Non-literal specifier on purpose: tsc then does not need serialport's type
+// declarations, so the build still passes on a host where the optional
+// native package was not installed.
+const SERIALPORT_MODULE = "serialport";
+
+function loadSerialModule(): Promise<SerialModule | null> {
+  if (!modulePromise) {
+    modulePromise = (import(SERIALPORT_MODULE) as Promise<unknown>)
+      .then((m) => m as SerialModule)
+      .catch((err: Error) => {
+        status.lastError = `serialport module unavailable: ${err.message}`;
+        logger.warn(status.lastError);
+        return null;
+      });
+  }
+  return modulePromise;
+}
+
+let port: PortLike | null = null;
 let retryTimer: NodeJS.Timeout | null = null;
 let stopped = false;
 
@@ -43,14 +94,17 @@ function scheduleReconnect() {
   if (stopped || retryTimer) return;
   retryTimer = setTimeout(() => {
     retryTimer = null;
-    open();
+    void open();
   }, retryInterval);
 }
 
-function open() {
+async function open() {
   if (stopped) return;
 
-  const serial = new SerialPort(
+  const mod = await loadSerialModule();
+  if (!mod || stopped) return;
+
+  const serial = new mod.SerialPort(
     {
       path: status.path,
       baudRate: status.baudRate,
@@ -82,7 +136,7 @@ function open() {
     status.reconnectAttempts = 0;
     logger.info(`Serial port connected → ${status.path} @ ${status.baudRate}`);
 
-    const parser = serial.pipe(new ReadlineParser({ delimiter: "\n" }));
+    const parser = serial.pipe(new mod.ReadlineParser({ delimiter: "\n" }));
 
     parser.on("data", (line: string) => {
       status.lastLineAt = new Date().toISOString();
@@ -96,7 +150,7 @@ function open() {
       scheduleReconnect();
     });
 
-    serial.on("error", (e) => {
+    serial.on("error", (e: Error) => {
       status.lastError = e.message;
       logger.error(`Serial error on ${status.path}: ${e.message}`);
     });
@@ -105,7 +159,7 @@ function open() {
 
 export function initSerial(): void {
   stopped = false;
-  open();
+  void open();
 }
 
 export function closeSerial(): void {
@@ -121,8 +175,14 @@ export function closeSerial(): void {
 
 /** Lists serial ports available on this machine (for the dashboard's setup UI). */
 export async function listSerialPorts() {
+  // Never load the native module just to answer a status request when the
+  // link is disabled — a cloud host has no serial ports to list anyway.
+  if (env.SERIAL_ENABLED !== "true") return [];
+
   try {
-    const ports = await SerialPort.list();
+    const mod = await loadSerialModule();
+    if (!mod) return [];
+    const ports = await mod.SerialPort.list();
     return ports.map((p) => ({
       path: p.path,
       manufacturer: p.manufacturer ?? null,

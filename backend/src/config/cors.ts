@@ -11,6 +11,22 @@ const configured = env.CORS_ALLOWED_ORIGINS.split(",")
   .map((o) => o.trim())
   .filter(Boolean);
 
+/**
+ * Entries may carry one wildcard label, e.g. `https://*.vercel.app`, so that
+ * every Vercel preview deployment (`<project>-<hash>-<team>.vercel.app`) is
+ * accepted without listing each one. The wildcard matches exactly one DNS
+ * label — it never spans a dot — so `*.vercel.app` cannot be satisfied by
+ * `evil.com.vercel.app`-style nesting tricks on a different apex.
+ */
+const wildcardPatterns = configured
+  .filter((o) => o.includes("*"))
+  .map((o) => {
+    // An origin is scheme://host[:port], so "." is the only regex
+    // metacharacter that can legitimately appear in one.
+    const escaped = o.replace(/\./g, "\\.").replace(/\*/g, "[a-z0-9-]+");
+    return new RegExp(`^${escaped}$`, "i");
+  });
+
 const LOCALHOST = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/;
 
 /**
@@ -25,6 +41,7 @@ const PRIVATE_LAN =
 
 export function isOriginAllowed(origin: string): boolean {
   if (configured.includes(origin)) return true;
+  if (wildcardPatterns.some((re) => re.test(origin))) return true;
   if (isDev && (LOCALHOST.test(origin) || PRIVATE_LAN.test(origin))) return true;
   return false;
 }

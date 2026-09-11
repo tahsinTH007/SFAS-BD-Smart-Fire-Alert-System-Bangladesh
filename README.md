@@ -80,14 +80,28 @@ Frontend on http://localhost:3000, API on http://localhost:8080.
 
 ### No Arduino attached?
 
-Drive the real ingest pipeline with synthetic frames:
+Set `DEVICE_SIMULATOR=true` (and `SERIAL_ENABLED=false`) in `backend/.env`
+and the API runs four synthetic OGNIBORMO units itself, inside the server
+process, through the real ingest pipeline. Each unit is a small state machine
+with its own room baseline: mostly quiet, with the occasional cooking-smoke
+false alarm that correctly does *not* alert, smoulders that sometimes escalate
+to flame, gas leaks, and fires — every one scored by the fusion engine and
+pushed over the socket like a real frame. This is what the hosted demo runs;
+the Settings page shows which units are simulated and what each is doing.
+
+For a one-off from a separate terminal there is also the older script:
 
 ```bash
 cd backend && npm run simulate
 ```
 
-`npm run simulate -- --burst` fires one round of incidents and exits. Set
-`SERIAL_ENABLED=false` to stop the serial reconnect attempts entirely.
+`npm run simulate -- --burst` fires one round of incidents and exits.
+
+### Deploying
+
+Frontend on Vercel, API on Render, database on MongoDB Atlas — all free
+tiers. [DEPLOYMENT.md](DEPLOYMENT.md) walks through it and lists every URL
+and variable that has to be exchanged between the three.
 
 ---
 
@@ -232,7 +246,7 @@ backend/src
 │   ├── buildings/ · stations/
 │   ├── units/     unit board, crew roster, dispatch lifecycle
 │   ├── analytics/ area / type / cause / hour / response reporting
-│   └── sensors/   riskEngine · ingest service · serial listener
+│   └── sensors/   riskEngine · ingest service · serial listener · simulator
 ├── lib/routing.ts ETA + route estimation
 ├── routes/        · middlewares/ · scripts/ (seed, seed-units, simulate)
 

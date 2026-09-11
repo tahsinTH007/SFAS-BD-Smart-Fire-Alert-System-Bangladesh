@@ -23,13 +23,14 @@ import { Panel, StatTile, EmptyState } from "./Primitives";
 import { AreaChart, type AreaPoint } from "./charts/AreaChart";
 import { BarList } from "./charts/BarList";
 import { STATUS } from "./charts/tokens";
-import type {
-  AlertStats,
-  BuildingStats,
-  DeviceStats,
-  HealthReport,
-  TimeseriesPoint,
-  TopDevice,
+import {
+  describeSensorFeed,
+  type AlertStats,
+  type BuildingStats,
+  type DeviceStats,
+  type HealthReport,
+  type TimeseriesPoint,
+  type TopDevice,
 } from "@/api/types";
 
 interface OverviewTabProps {
@@ -91,6 +92,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
     (alertStats?.byPriority.critical ?? 0) +
     (alertStats?.byPriority.important ?? 0) +
     (alertStats?.byPriority.info ?? 0);
+
+  const feed = describeSensorFeed(health);
 
   return (
     <div className="flex flex-col gap-5">
@@ -249,16 +252,16 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({
             <HealthRow
               label="Redis cache"
               up={health?.dependencies.redis.up ?? false}
-              detail="Caching + rate limiting"
+              detail={
+                health && !health.dependencies.redis.enabled
+                  ? "Disabled — in-memory rate limiting"
+                  : "Caching + rate limiting"
+              }
             />
             <HealthRow
-              label="Serial link"
-              up={health?.dependencies.serial.up ?? false}
-              detail={
-                health?.dependencies.serial.port
-                  ? `Arduino on ${health.dependencies.serial.port}`
-                  : "Arduino sensor bridge"
-              }
+              label="Sensor feed"
+              up={feed.up}
+              detail={feed.detail}
             />
             <HealthRow
               label="Live socket"

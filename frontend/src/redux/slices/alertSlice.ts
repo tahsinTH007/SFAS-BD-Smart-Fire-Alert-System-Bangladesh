@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { alertApi } from "@/api/alertApi";
 import { toApiError } from "@/lib/axiosClient";
+import { fetchForCurrentStation } from "@/lib/scoped";
 import type { AlertResponse, AlertStats } from "@/api/types";
 import type { RootState } from "../store";
 
@@ -22,7 +23,10 @@ export const fetchAlerts = createAsyncThunk<
 >("alerts/fetchAlerts", async (_, { rejectWithValue, getState }) => {
   try {
     // Every read is scoped to the station this console is deployed for.
-    return await alertApi.getAllAlerts(getState().session.stationId ?? undefined);
+    return await fetchForCurrentStation(
+      () => getState().session.stationId,
+      (scope) => alertApi.getAllAlerts(scope),
+    );
   } catch (err) {
     return rejectWithValue(asError(err));
   }
@@ -61,7 +65,10 @@ export const fetchAlertStats = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("alerts/fetchStats", async (_, { rejectWithValue, getState }) => {
   try {
-    return await alertApi.getStats(getState().session.stationId ?? undefined);
+    return await fetchForCurrentStation(
+      () => getState().session.stationId,
+      (scope) => alertApi.getStats(scope),
+    );
   } catch (err) {
     return rejectWithValue(asError(err));
   }

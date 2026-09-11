@@ -225,13 +225,38 @@ export interface RiskAssessment {
   summary: string;
 }
 
+/** A synthetic unit run by the API's built-in simulator (hosted demos). */
+export interface SimulatedUnit {
+  deviceCode: string;
+  label: string | null;
+  phase:
+    | "normal"
+    | "cooking"
+    | "heat"
+    | "smoulder"
+    | "gas-leak"
+    | "fire"
+    | "recovery";
+}
+
+export interface SimulatorStatus {
+  enabled: boolean;
+  running: boolean;
+  intervalMs: number;
+  frames: number;
+  lastFrameAt: string | null;
+  units: SimulatedUnit[];
+}
+
 export interface SerialStatus {
   connected: boolean;
+  enabled: boolean;
   path: string;
   baudRate: number;
   lastLineAt: string | null;
   lastError: string | null;
   availablePorts: { path: string; manufacturer: string | null }[];
+  simulator: SimulatorStatus;
 }
 
 export interface HealthReport {
@@ -241,9 +266,55 @@ export interface HealthReport {
   env: string;
   dependencies: {
     mongodb: { required: boolean; up: boolean };
-    redis: { required: boolean; up: boolean };
-    serial: { required: boolean; up: boolean; port: string; lastLineAt: string | null };
+    redis: { required: boolean; up: boolean; enabled: boolean };
+    serial: {
+      required: boolean;
+      up: boolean;
+      enabled: boolean;
+      port: string;
+      lastLineAt: string | null;
+    };
+    simulator: {
+      required: boolean;
+      up: boolean;
+      enabled: boolean;
+      intervalMs: number;
+      lastFrameAt: string | null;
+      units: SimulatedUnit[];
+    };
   };
+}
+
+/**
+ * One line describing where sensor frames are coming from, for the health
+ * panels: a board on a serial port, the built-in simulator, or nothing.
+ */
+export function describeSensorFeed(
+  health: HealthReport | null,
+): { up: boolean; detail: string } {
+  if (!health) return { up: false, detail: "Checking…" };
+
+  const { serial, simulator } = health.dependencies;
+
+  if (serial.up) return { up: true, detail: `Arduino on ${serial.port}` };
+
+  if (simulator?.up) {
+    const n = simulator.units.length;
+    const active = simulator.units.filter(
+      (u) => u.phase !== "normal" && u.phase !== "recovery",
+    ).length;
+    return {
+      up: true,
+      detail: `${n} simulated unit${n === 1 ? "" : "s"} reporting${
+        active ? ` · ${active} incident${active === 1 ? "" : "s"} in progress` : ""
+      }`,
+    };
+  }
+
+  if (serial.enabled) {
+    return { up: false, detail: `No board on ${serial.port} — run the simulator to demo` };
+  }
+  return { up: false, detail: "Serial link disabled — no live sensor source" };
 }
 
 // ─── Units & dispatch ────────────────────────────────────────────────────────

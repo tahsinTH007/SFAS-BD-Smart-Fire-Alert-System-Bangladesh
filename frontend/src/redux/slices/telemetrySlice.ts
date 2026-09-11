@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import { deviceApi } from "@/api/systemApi";
 import { toApiError } from "@/lib/axiosClient";
+import { fetchForCurrentStation } from "@/lib/scoped";
 import type { DeviceStats, ReadingPoint, TelemetryDevice } from "@/api/types";
 import type { RootState } from "../store";
 
@@ -28,7 +29,10 @@ export const fetchTelemetry = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("telemetry/fetch", async (_, { rejectWithValue, getState }) => {
   try {
-    return await deviceApi.telemetry(getState().session.stationId ?? undefined);
+    return await fetchForCurrentStation(
+      () => getState().session.stationId,
+      (scope) => deviceApi.telemetry(scope),
+    );
   } catch (err) {
     return rejectWithValue(toApiError(err).message);
   }
@@ -40,7 +44,10 @@ export const fetchDeviceStats = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("telemetry/stats", async (_, { rejectWithValue, getState }) => {
   try {
-    return await deviceApi.stats(getState().session.stationId ?? undefined);
+    return await fetchForCurrentStation(
+      () => getState().session.stationId,
+      (scope) => deviceApi.stats(scope),
+    );
   } catch (err) {
     return rejectWithValue(toApiError(err).message);
   }
@@ -52,9 +59,9 @@ export const seedHistory = createAsyncThunk<
   { rejectValue: string; state: RootState }
 >("telemetry/seedHistory", async (_, { rejectWithValue, getState }) => {
   try {
-    return await deviceApi.recentReadings(
-      HISTORY_LIMIT,
-      getState().session.stationId ?? undefined,
+    return await fetchForCurrentStation(
+      () => getState().session.stationId,
+      (scope) => deviceApi.recentReadings(HISTORY_LIMIT, scope),
     );
   } catch (err) {
     return rejectWithValue(toApiError(err).message);

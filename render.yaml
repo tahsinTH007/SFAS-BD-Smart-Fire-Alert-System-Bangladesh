@@ -1,0 +1,70 @@
+# Render Blueprint for the SFAS-BD API.
+#
+# The backend runs Socket.IO and the built-in device simulator, both of which
+# need one long-lived process — so it is hosted here rather than on Vercel
+# (which only runs short-lived serverless functions). The Next.js frontend is
+# deployed separately to Vercel and pointed at this service's URL.
+#
+# Deploy: Render dashboard → New → Blueprint → pick this repository. Render
+# reads this file, creates the service and prompts for the `sync: false`
+# values below. See DEPLOYMENT.md for the full walkthrough.
+services:
+  - type: web
+    name: sfas-bd-api
+    runtime: node
+    plan: free
+    region: singapore # closest region to Bangladesh
+    rootDir: backend
+    # NODE_ENV=production makes `npm ci` skip devDependencies, and tsc is one.
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/v1/health/live
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "22"
+      - key: LOG_LEVEL
+        value: info
+
+      # ── Fill these in on the Render dashboard ──────────────────────────────
+      # MongoDB Atlas connection string (Database → Connect → Drivers).
+      - key: MONGO_URI
+        sync: false
+      # Your Vercel URL(s). The wildcard also admits Vercel preview deployments.
+      # e.g. https://sfas-bd.vercel.app,https://*.vercel.app
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Same value as the first entry in CORS_ALLOWED_ORIGINS.
+      - key: SOCKET_CORS_ORIGIN
+        sync: false
+      # This service's own public URL, e.g. https://sfas-bd-api.onrender.com
+      - key: BASE_URL
+        sync: false
+
+      - key: DB_NAME
+        value: smartFireAlertSystem
+
+      # No hardware and no Redis on this host.
+      - key: SERIAL_ENABLED
+        value: "false"
+      - key: REDIS_ENABLED
+        value: "false"
+
+      # Synthetic OGNIBORMO units, driven through the real ingest pipeline.
+      - key: DEVICE_SIMULATOR
+        value: "true"
+      - key: DEVICE_SIMULATOR_COUNT
+        value: "4"
+      - key: DEVICE_SIMULATOR_INTERVAL_MS
+        value: "3000"
+
+      # Detection thresholds — defaults suit the simulator; the values in
+      # backend/.env.example are calibrated for the physical ESP32 unit.
+      - key: SMOKE_THRESHOLD
+        value: "80"
+      - key: GAS_THRESHOLD
+        value: "300"
+      - key: TEMP_THRESHOLD
+        value: "50"
