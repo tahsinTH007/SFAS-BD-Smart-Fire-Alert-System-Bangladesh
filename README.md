@@ -1,7 +1,26 @@
-# SFAS-BD — Smart Fire Alert System, Bangladesh
+<p align="center">
+  <img src="frontend/public/logo.png" alt="OGNIBORMO logo" width="96" />
+</p>
 
-Control-room software for **OGNIBORMO**, a multi-sensor smart fire detection and
-monitoring system by **Team HALCYON**, Armed Police Battalion School and College.
+<h1 align="center">SFAS-BD — Smart Fire Alert System, Bangladesh</h1>
+
+<p align="center">
+  Control-room console for <b>OGNIBORMO</b>, a multi-sensor smart fire detection<br/>
+  and monitoring system by <b>Team HALCYON</b>, Armed Police Battalion School and College.
+</p>
+
+<p align="center">
+  <img alt="Node.js" src="https://img.shields.io/badge/Node.js-20%2B-339933?logo=node.js&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
+  <img alt="Next.js" src="https://img.shields.io/badge/Next.js-16-000000?logo=next.js&logoColor=white">
+  <img alt="React" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black">
+  <img alt="Express" src="https://img.shields.io/badge/Express-4-000000?logo=express&logoColor=white">
+  <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white">
+  <img alt="Socket.IO" src="https://img.shields.io/badge/Socket.IO-4-010101?logo=socket.io&logoColor=white">
+  <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white">
+</p>
+
+---
 
 **One console per fire station.** A station — Uttara, say — is given this system
 to monitor every building in its area that has OGNIBORMO units installed. The
@@ -13,10 +32,24 @@ An OGNIBORMO unit watches five environmental parameters at once — flame, smoke
 gas, temperature and humidity — and this system turns that stream into something
 an operator can act on: **Detect → Monitor → Analyze → Alert → Respond**.
 
-> **Scope note.** The field unit is an **Arduino prototype** connected over
-> serial. ESP32 / PLC controllers, wireless links and cloud deployment are the
-> planned upgrade path, not what is built today. The HTTP ingest endpoint exists
-> so a networked unit can be dropped in later without changing the pipeline.
+> **Scope note.** The field unit currently deployed is an **Arduino prototype**
+> connected over serial. The `firmware/` folder holds ESP32 sketches for the
+> planned upgrade (wireless, PLC-driven) path — code that exists, not hardware
+> that is shipped. The HTTP ingest endpoint already accepts a networked unit so
+> that upgrade drops in without changing the pipeline.
+
+## Contents
+
+- [Why multi-sensor fusion](#why-multi-sensor-fusion)
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Getting started](#getting-started)
+- [No Arduino attached?](#no-arduino-attached)
+- [Deploying](#deploying)
+- [API](#api)
+- [Project structure](#project-structure)
+- [Security note](#security-note)
+- [Theming](#theming)
 
 ---
 
@@ -26,9 +59,9 @@ A single sensor tripping is not a fire. High temperature alone is a hot
 afternoon; smoke alone is a cooking pan. Confidence comes from **independent
 sensors agreeing at once**.
 
-`backend/src/modules/sensors/riskEngine.ts` scores every reading 0–100 and
-records which sensors contributed, so the dashboard can explain *why* an alert
-fired rather than just showing a number:
+[`backend/src/modules/sensors/riskEngine.ts`](backend/src/modules/sensors/riskEngine.ts)
+scores every reading 0–100 and records which sensors contributed, so the
+dashboard can explain *why* an alert fired rather than just showing a number:
 
 | Scenario | Readings | Score | Result |
 |---|---|---|---|
@@ -51,7 +84,109 @@ Thresholds are configurable — `SMOKE_THRESHOLD`, `GAS_THRESHOLD`,
 
 ---
 
-## Running it
+## Features
+
+- 🗺️ **Live map** (`/`) — alerts geolocated across Dhaka on a dark OpenStreetMap basemap, with a live-updating sidebar
+- 📊 **Dashboard** (`/dashboard`) — Overview, Live Sensors, Devices/Buildings/Stations CRUD, Units & Crew, and a reporting Summary tab
+- 🔔 **Alert console** (`/notifications`) — filter, bulk acknowledge/read/delete, full alert detail with the fusion breakdown and operator log
+- 🚒 **Dispatch** — ETA-ranked unit recommendations, one-click dispatch, and a assigned → rolling → on scene → cleared lifecycle
+- 🛣️ **Routing & ETA** — Dhaka-traffic-aware estimate out of the box, or real road routes via an OSRM instance
+- 🚨 **Full-screen critical alerts** — takes over the screen for a live or recent Critical, re-sounds until acknowledged
+- ⚡ **Low-latency ingest** — alert raised and broadcast before secondary writes are awaited (~38 ms median round trip, measured locally)
+- 📱 **Responsive** — full mobile layout: bottom-sheet alert list, drawer nav, bottom-sheet critical banner
+- 🌓 **Light / dark / system theming** via a single CSS-variable ramp, no `dark:` class sprawl
+- 🧪 **Built-in device simulator** — four synthetic OGNIBORMO units run through the *real* ingest pipeline when no hardware is attached, for demos and hosted deployments
+
+<details>
+<summary><b>More detail on each area</b></summary>
+
+### Units, crew and dispatch
+
+The dashboard's **Units & Crew** tab is the station officer's unit board: which
+appliances are resting at station, which are en route or on scene, and which are
+out of service. Each unit expands to its full crew roster — rank, role, phone,
+blood group, certifications, years of service — and any crew member can be
+flipped on or off duty inline.
+
+From an incident, the **Dispatch** panel lists every available unit *ranked by
+arrival time*, pre-selects a sensible first alarm for the incident type (an
+engine always; medic and rescue for a critical; a ladder above the 4th floor;
+foam for a gas incident), and assigns them in one click. Dispatching also
+acknowledges the incident, because that is what it means.
+
+Each dispatch then moves through **assigned → rolling → on scene → cleared**,
+and those timestamps feed the response-time reporting.
+
+### Routing and ETA
+
+[`backend/src/lib/routing.ts`](backend/src/lib/routing.ts) estimates how long
+each unit will take to reach the incident. Units are ordered by **ETA, not
+distance** — a unit 3 km away across a rush-hour arterial can lose to one 5 km
+away on clear roads.
+
+Without a routing provider it multiplies straight-line distance by a road
+circuity factor (1.4 for Uttara's street grid) and divides by a speed that
+varies with the hour, because Dhaka traffic is the dominant term in any real
+response time: 14 km/h in the morning rush, 12 in the evening, 34 overnight,
+plus 1.5 minutes turnout. Every figure is labelled as an estimate in the UI.
+
+Set `ROUTING_OSRM_URL` to an OSRM instance and it uses real road routes instead,
+including the polyline.
+
+### Reporting
+
+The **Summary** tab answers the questions a station officer actually asks:
+
+- **Where** — alerts by sector, and the buildings raising most of them (candidates for an inspection visit)
+- **What** — by incident type, with the share of each
+- **Why** — which sensors contributed, so a dominant cause is visible at source
+- **When** — alerts by hour of day, a staffing signal
+- **How fast** — average time to acknowledge and resolve, and actual travel time measured against the estimated ETA
+
+### Critical alerts
+
+A corner toast is the wrong weight for a building fire. A critical alert takes
+over the screen with the location, risk score, people at risk, flame state and
+which sensors agreed — with **Acknowledge** as the primary action. It re-sounds
+every 12 seconds until acknowledged, and `Esc` snoozes without acknowledging.
+
+Only *current* alerts take over: one that arrived over the socket while the
+console was open, or was raised in the last 10 minutes. Opening the console to a
+backlog of old unacknowledged criticals shows the list, not a wall of takeovers.
+
+Everything is configurable in Settings — full-screen takeover, sound, repeat,
+desktop notifications, and the minimum priority that interrupts you.
+
+### Speed
+
+The ingest path is ordered for latency: the risk score is computed and the alert
+is raised and broadcast **before** the reading-history and device-snapshot writes
+are awaited. In practice the socket push reaches the browser before the ingest
+HTTP call returns — measured at a **38 ms median** round trip locally, with
+socket round-trip time shown live in Settings.
+
+WebSocket is preferred on first connect (no long-poll handshake) and payload
+compression is off: alert payloads are ~1KB, and compressing them costs more
+latency than the bytes are worth.
+
+</details>
+
+---
+
+## Tech stack
+
+| Layer | Stack |
+|---|---|
+| **Frontend** | Next.js 16 (App Router) · React 19 · TypeScript · Redux Toolkit · Tailwind CSS 4 · Radix UI · Leaflet / react-leaflet · Socket.IO client |
+| **Backend** | Node.js 20+ · Express 4 · TypeScript (ESM/NodeNext) · Socket.IO · Zod · Winston · bcrypt |
+| **Database** | MongoDB (Atlas or local) via Mongoose |
+| **Cache / rate limiting** | Redis (optional — falls back to in-memory) |
+| **Hardware** | Arduino prototype (serial) today · ESP32 firmware in `firmware/` for the wireless upgrade |
+| **Hosting** | Vercel (frontend) · Render (API, long-lived process for Socket.IO + simulator) · MongoDB Atlas |
+
+---
+
+## Getting started
 
 **Prerequisites:** Node 20+, MongoDB. Redis is optional — without it, caching is
 skipped and rate limiting falls back to per-process memory.
@@ -60,10 +195,11 @@ skipped and rate limiting falls back to per-process memory.
 cd backend && npm install && cp .env.example .env
 ```
 
-Set `MONGO_URI` in `backend/.env`, then:
+Set `MONGO_URI` in `backend/.env` (a local `mongodb://127.0.0.1:27017` or an
+Atlas connection string both work), then:
 
 ```bash
-cd backend && npm run seed && npm run dev
+npm run seed && npm run dev
 ```
 
 `npm run seed:units` adds response units and their crews on top of that.
@@ -101,112 +237,13 @@ cd backend && npm run simulate
 
 Frontend on Vercel, API on Render, database on MongoDB Atlas — all free
 tiers. [DEPLOYMENT.md](DEPLOYMENT.md) walks through it and lists every URL
-and variable that has to be exchanged between the three.
+and variable that has to be exchanged between the three. `render.yaml`,
+`frontend/vercel.json` and `backend/vercel.json` ship ready to use.
 
----
-
-## What's in it
-
-**Live map** (`/`) — alerts geolocated across Dhaka on a dark OpenStreetMap
-basemap, with a live-updating sidebar.
-
-**Dashboard** (`/dashboard`) — five tabs:
-- *Overview* — active alerts, unit health, alert-activity trend, priority
-  breakdown, most-active units, live dependency health
-- *Live Sensors* — per-unit risk meters and sparklines for all five sensors,
-  with threshold rules drawn in
-- *Devices / Buildings / Stations* — full CRUD, searchable and sortable
-
-**Alert console** (`/notifications`) — filter by priority, status and read state;
-bulk acknowledge, mark-read and delete.
-
-**Alert detail** (`/notifications/[id]`) — the fusion result and contributing
-sensors, the readings at trigger time, an operator log, and the
-acknowledge → resolve workflow.
-
-**My profile** (`/profile`) — operator identity (the name written onto every
-acknowledgement), your station posting, and a record of what you have handled.
-
-**Settings** (`/settings`) — which station this console serves, colour theme
-(light / dark / system), alerting behaviour, live system status with socket
-round-trip time, and the detection thresholds in force.
-
-### Units, crew and dispatch
-
-The dashboard's **Units & Crew** tab is the station officer's unit board: which
-appliances are resting at station, which are en route or on scene, and which are
-out of service. Each unit expands to its full crew roster — rank, role, phone,
-blood group, certifications, years of service — and any crew member can be
-flipped on or off duty inline.
-
-From an incident, the **Dispatch** panel lists every available unit *ranked by
-arrival time*, pre-selects a sensible first alarm for the incident type (an
-engine always; medic and rescue for a critical; a ladder above the 4th floor;
-foam for a gas incident), and assigns them in one click. Dispatching also
-acknowledges the incident, because that is what it means.
-
-Each dispatch then moves through **assigned → rolling → on scene → cleared**,
-and those timestamps feed the response-time reporting.
-
-### Routing and ETA
-
-`backend/src/lib/routing.ts` estimates how long each unit will take to reach the
-incident. Units are ordered by **ETA, not distance** — a unit 3 km away across a
-rush-hour arterial can lose to one 5 km away on clear roads.
-
-Without a routing provider it multiplies straight-line distance by a road
-circuity factor (1.4 for Uttara's street grid) and divides by a speed that
-varies with the hour, because Dhaka traffic is the dominant term in any real
-response time: 14 km/h in the morning rush, 12 in the evening, 34 overnight,
-plus 1.5 minutes turnout. Every figure is labelled as an estimate in the UI.
-
-Set `ROUTING_OSRM_URL` to an OSRM instance and it uses real road routes instead,
-including the polyline.
-
-### Reporting
-
-The **Summary** tab answers the questions a station officer actually asks:
-
-- **Where** — alerts by sector, and the buildings raising most of them
-  (candidates for an inspection visit)
-- **What** — by incident type, with the share of each
-- **Why** — which sensors contributed, so a dominant cause is visible at source
-- **When** — alerts by hour of day, a staffing signal
-- **How fast** — average time to acknowledge and resolve, and actual travel time
-  measured against the estimated ETA
-
-### Critical alerts
-
-A corner toast is the wrong weight for a building fire. A critical alert takes
-over the screen with the location, risk score, people at risk, flame state and
-which sensors agreed — with **Acknowledge** as the primary action. It re-sounds
-every 12 seconds until acknowledged, and `Esc` snoozes without acknowledging.
-
-Only *current* alerts take over: one that arrived over the socket while the
-console was open, or was raised in the last 10 minutes. Opening the console to a
-backlog of old unacknowledged criticals shows the list, not a wall of takeovers.
-
-Everything is configurable in Settings — full-screen takeover, sound, repeat,
-desktop notifications, and the minimum priority that interrupts you.
-
-### Speed
-
-The ingest path is ordered for latency: the risk score is computed and the alert
-is raised and broadcast **before** the reading-history and device-snapshot writes
-are awaited. In practice the socket push reaches the browser before the ingest
-HTTP call returns — measured at a **38 ms median** round trip locally, with
-socket round-trip time shown live in Settings.
-
-WebSocket is preferred on first connect (no long-poll handshake) and payload
-compression is off: alert payloads are ~1KB, and compressing them costs more
-latency than the bytes are worth.
-
-### On a phone
-
-The console is responsive. On mobile the map goes full-bleed with a counts strip
-and a bottom-sheet alert list, navigation collapses into a drawer, tables scroll
-inside their own containers, and the critical banner becomes a bottom sheet with
-a full-width acknowledge button.
+> The backend also has a Vercel-compatible serverless entry
+> ([`backend/api/index.ts`](backend/api/index.ts)) for REST-only access to the
+> database. Socket.IO and the device simulator need one persistent process, so
+> they don't run there — Render remains the host for the full real-time console.
 
 ---
 
@@ -234,12 +271,12 @@ traffic.
 
 ---
 
-## Layout
+## Project structure
 
-```
+```text
 backend/src
 ├── config/        env, cors, redis, socket, serial, rate limiting
-├── db/models/     Alert, Device, Building, Station, Reading
+├── db/models/     Alert, Device, Building, Station, Reading, Unit, Dispatch
 ├── modules/
 │   ├── alerts/    controller · service · repository · validator
 │   ├── devices/   + telemetry history and API-key issuance
@@ -248,7 +285,8 @@ backend/src
 │   ├── analytics/ area / type / cause / hour / response reporting
 │   └── sensors/   riskEngine · ingest service · serial listener · simulator
 ├── lib/routing.ts ETA + route estimation
-├── routes/        · middlewares/ · scripts/ (seed, seed-units, simulate)
+├── routes/ · middlewares/ · scripts/ (seed, seed-units, simulate, export/import data)
+└── api/index.ts   Vercel serverless entry (REST only)
 
 frontend/src
 ├── app/           map · dashboard · notifications
@@ -257,6 +295,8 @@ frontend/src
 │                  profile · settings · alerts · ui
 ├── redux/         alert + telemetry + session slices
 └── socket/        Socket.IO client
+
+firmware/          ESP32 sketches for the planned wireless upgrade
 ```
 
 ---
@@ -285,3 +325,7 @@ every surface at once with no component churn and nothing to keep in sync.
 
 Status hues — red, amber, emerald, sky, orange — are deliberately not remapped: a
 critical alert stays red in both themes.
+
+---
+
+<p align="center"><sub>Built by <b>Team HALCYON</b> — Armed Police Battalion School and College.</sub></p>
