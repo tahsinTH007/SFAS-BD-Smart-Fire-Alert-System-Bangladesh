@@ -2,9 +2,13 @@ import path from "node:path";
 import fs from "node:fs";
 import { createLogger, format, transports } from "winston";
 
+// Vercel's serverless functions have a read-only filesystem outside /tmp, so
+// file transports are skipped there — console output still reaches Vercel's
+// function logs.
+const canWriteFiles = !process.env.VERCEL;
 const logDir = path.resolve("logs");
 
-if (!fs.existsSync(logDir)) {
+if (canWriteFiles && !fs.existsSync(logDir)) {
   fs.mkdirSync(logDir, { recursive: true });
 }
 
@@ -39,22 +43,26 @@ export const logger = createLogger({
   transports: [
     new transports.Console({ format: consoleFormat }),
 
-    new transports.File({
-      filename: path.join(logDir, "error.log"),
-      level: "error",
-      maxsize: 5 * 1024 * 1024,
-      maxFiles: 5,
-      tailable: true,
-      format: fileFormat,
-    }),
+    ...(canWriteFiles
+      ? [
+          new transports.File({
+            filename: path.join(logDir, "error.log"),
+            level: "error",
+            maxsize: 5 * 1024 * 1024,
+            maxFiles: 5,
+            tailable: true,
+            format: fileFormat,
+          }),
 
-    new transports.File({
-      filename: path.join(logDir, "combined.log"),
-      maxsize: 10 * 1024 * 1024,
-      maxFiles: 5,
-      tailable: true,
-      format: fileFormat,
-    }),
+          new transports.File({
+            filename: path.join(logDir, "combined.log"),
+            maxsize: 10 * 1024 * 1024,
+            maxFiles: 5,
+            tailable: true,
+            format: fileFormat,
+          }),
+        ]
+      : []),
   ],
 
   exitOnError: false,
