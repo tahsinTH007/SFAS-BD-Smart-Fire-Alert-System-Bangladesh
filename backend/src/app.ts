@@ -1,5 +1,5 @@
 import express from "express";
-import helmet from "helmet";
+import helmetImport from "helmet";
 import { errorHandler } from "./middlewares/errorHandler.js";
 import { notFoundHandler } from "./middlewares/notFoundHandler.js";
 import { requestMetrics } from "./middlewares/requestMetrics.js";
@@ -7,6 +7,16 @@ import { corsMiddleware } from "./config/cors.js";
 import { apiRouter } from "./routes/index.js";
 import { applyGlobalRateLimit } from "./config/globalRateLimit.js";
 import { env } from "./config/env.js";
+
+// helmet's default export is a callable function, but some build environments
+// (notably Vercel's serverless-function type-checker) mis-resolve its dual
+// ESM/CJS types to the whole module namespace instead — "not callable" at
+// compile time even though the runtime value is correct. The signature below
+// is written out by hand (not derived from `typeof helmetImport`) so the fix
+// doesn't depend on that same resolution succeeding.
+const helmet = helmetImport as unknown as (
+  options?: Record<string, unknown>,
+) => express.RequestHandler;
 
 export function createApp() {
   const app = express();
