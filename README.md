@@ -18,6 +18,7 @@
   <img alt="MongoDB" src="https://img.shields.io/badge/MongoDB-Atlas-47A248?logo=mongodb&logoColor=white">
   <img alt="Socket.IO" src="https://img.shields.io/badge/Socket.IO-4-010101?logo=socket.io&logoColor=white">
   <img alt="Tailwind CSS" src="https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?logo=tailwindcss&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/License-MIT-yellow.svg">
 </p>
 
 ---
@@ -50,6 +51,7 @@ an operator can act on: **Detect → Monitor → Analyze → Alert → Respond**
 - [Project structure](#project-structure)
 - [Security note](#security-note)
 - [Theming](#theming)
+- [License](#license)
 
 ---
 
@@ -325,6 +327,12 @@ every surface at once with no component churn and nothing to keep in sync.
 
 Status hues — red, amber, emerald, sky, orange — are deliberately not remapped: a
 critical alert stays red in both themes.
+
+---
+
+## License
+
+[MIT](LICENSE) © 2026 Tahsin Hassan
 
 ---
 
